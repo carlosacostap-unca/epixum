@@ -608,7 +608,11 @@ export async function getStudentCourses() {
         // Flatten the data structure
         const courses = data.map(item => {
             // @ts-ignore
-            const course = item.courses
+            const rawCourse = item.courses
+            const course: any = Array.isArray(rawCourse) ? rawCourse[0] : rawCourse
+            
+            if (!course) return null
+
             return {
                 id: course.id,
                 name: course.name,
@@ -617,7 +621,7 @@ export async function getStudentCourses() {
                 // @ts-ignore
                 institution_name: course.instituciones?.nombre
             }
-        })
+        }).filter(Boolean)
 
         return { success: true, data: courses }
     } catch (error: unknown) {
