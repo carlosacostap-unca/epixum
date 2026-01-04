@@ -73,6 +73,39 @@ export async function createSprint(formData: FormData) {
 export async function getSprints(courseId: string) {
     try {
         const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+
+        if (user && user.email) {
+             const adminClient = createAdminClient(
+                process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                process.env.SUPABASE_SERVICE_ROLE_KEY!,
+                {
+                    auth: {
+                        autoRefreshToken: false,
+                        persistSession: false
+                    }
+                }
+            )
+
+            // Check if teacher
+            const { data: teacherEnrollment } = await adminClient
+                .from('course_enrollments')
+                .select('id')
+                .eq('course_id', courseId)
+                .eq('email', user.email)
+                .eq('role', 'docente')
+                .single()
+
+            if (teacherEnrollment) {
+                 const { data, error } = await adminClient
+                    .from('sprints')
+                    .select('*')
+                    .eq('course_id', courseId)
+                    .order('start_date', { ascending: true })
+                 if (error) throw error
+                 return { success: true, data }
+            }
+        }
         
         const { data, error } = await supabase
             .from('sprints')

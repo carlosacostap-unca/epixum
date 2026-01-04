@@ -28,6 +28,28 @@ function getAdminClient() {
 
 export async function getClasses(courseId: string) {
     try {
+        const { user } = await checkAuth()
+        
+        // Try admin client for teacher check first
+        const adminClient = getAdminClient()
+        const { data: teacherEnrollment } = await adminClient
+            .from('course_enrollments')
+            .select('id')
+            .eq('course_id', courseId)
+            .ilike('email', user.email!)
+            .eq('role', 'docente')
+            .single()
+            
+        if (teacherEnrollment) {
+             const { data, error } = await adminClient
+                .from('classes')
+                .select('*')
+                .eq('course_id', courseId)
+                .order('date', { ascending: true })
+             if (error) throw error
+             return { success: true, data }
+        }
+
         const { supabase } = await checkAuth()
 
         const { data, error } = await supabase
@@ -85,9 +107,23 @@ export async function deleteClass(classId: string, courseId: string) {
 
 export async function getCourseDetails(courseId: string) {
     try {
-        const { supabase } = await checkAuth()
+        const { user } = await checkAuth()
+        const adminClient = getAdminClient()
 
-        const { data, error } = await supabase
+        // Verify teacher enrollment
+        const { data: enrollment, error: enrollmentError } = await adminClient
+            .from('course_enrollments')
+            .select('id')
+            .eq('course_id', courseId)
+            .ilike('email', user.email!)
+            .eq('role', 'docente')
+            .single()
+
+        if (enrollmentError || !enrollment) {
+            throw new Error('No tienes permiso de docente para ver este curso')
+        }
+
+        const { data, error } = await adminClient
             .from('courses')
             .select(`
                 id, 

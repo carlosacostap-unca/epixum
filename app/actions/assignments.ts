@@ -26,6 +26,28 @@ async function checkAuth() {
 
 export async function getAssignments(courseId: string) {
     try {
+        const { user } = await checkAuth()
+
+        // Try admin client for teacher check first
+        const adminClient = getAdminClient()
+        const { data: teacherEnrollment } = await adminClient
+            .from('course_enrollments')
+            .select('id')
+            .eq('course_id', courseId)
+            .ilike('email', user.email!)
+            .eq('role', 'docente')
+            .single()
+            
+        if (teacherEnrollment) {
+             const { data, error } = await adminClient
+                .from('assignments')
+                .select('*')
+                .eq('course_id', courseId)
+                .order('due_date', { ascending: true })
+             if (error) throw error
+             return { success: true, data }
+        }
+
         const { supabase } = await checkAuth()
 
         const { data, error } = await supabase
