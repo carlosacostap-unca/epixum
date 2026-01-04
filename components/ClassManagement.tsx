@@ -1,13 +1,22 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClass, deleteClass } from '@/app/actions/classes'
+import { getSprints } from '@/app/actions/sprints'
 
 interface ClassItem {
     id: string
     title: string
     description: string
     date: string
+    sprint_id?: string | null
+}
+
+interface Sprint {
+    id: string
+    title: string
+    start_date: string
+    end_date: string
 }
 
 interface ClassManagementProps {
@@ -19,6 +28,7 @@ import ResourceList from './ResourceList'
 
 export default function ClassManagement({ courseId, initialClasses }: ClassManagementProps) {
     const [classes, setClasses] = useState<ClassItem[]>(initialClasses)
+    const [sprints, setSprints] = useState<Sprint[]>([])
     const [isAdding, setIsAdding] = useState(false)
     const [loading, setLoading] = useState(false)
     
@@ -26,6 +36,17 @@ export default function ClassManagement({ courseId, initialClasses }: ClassManag
     const [title, setTitle] = useState('')
     const [description, setDescription] = useState('')
     const [date, setDate] = useState('')
+    const [selectedSprintId, setSelectedSprintId] = useState('')
+
+    useEffect(() => {
+        async function loadSprints() {
+            const result = await getSprints(courseId)
+            if (result.success && result.data) {
+                setSprints(result.data)
+            }
+        }
+        loadSprints()
+    }, [courseId])
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
@@ -36,13 +57,14 @@ export default function ClassManagement({ courseId, initialClasses }: ClassManag
             const dateObj = new Date(date)
             const isoDate = dateObj.toISOString()
 
-            const result = await createClass(courseId, title, description, isoDate)
+            const result = await createClass(courseId, title, description, isoDate, selectedSprintId || null)
             
             if (result.success) {
                 // Reset form and reload
                 setTitle('')
                 setDescription('')
                 setDate('')
+                setSelectedSprintId('')
                 setIsAdding(false)
                 window.location.reload()
             } else {
@@ -68,6 +90,13 @@ export default function ClassManagement({ courseId, initialClasses }: ClassManag
         } catch (error) {
             alert('Error inesperado')
         }
+    }
+
+    // Helper to find sprint title
+    const getSprintTitle = (sprintId: string | null | undefined) => {
+        if (!sprintId) return null
+        const sprint = sprints.find(s => s.id === sprintId)
+        return sprint ? sprint.title : null
     }
 
     return (
@@ -97,6 +126,25 @@ export default function ClassManagement({ courseId, initialClasses }: ClassManag
                                     className="w-full bg-black border border-neutral-700 rounded p-2 text-gray-100 focus:border-indigo-500 focus:outline-none"
                                 />
                             </div>
+                            
+                            {sprints.length > 0 && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-400 mb-1">Asignar a Sprint (Opcional)</label>
+                                    <select
+                                        value={selectedSprintId}
+                                        onChange={(e) => setSelectedSprintId(e.target.value)}
+                                        className="w-full bg-black border border-neutral-700 rounded p-2 text-gray-100 focus:border-indigo-500 focus:outline-none"
+                                    >
+                                        <option value="">-- Sin Sprint --</option>
+                                        {sprints.map(sprint => (
+                                            <option key={sprint.id} value={sprint.id}>
+                                                {sprint.title}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
                             <div>
                                 <label className="block text-sm font-medium text-gray-400 mb-1">Descripción</label>
                                 <textarea 
@@ -143,29 +191,40 @@ export default function ClassManagement({ courseId, initialClasses }: ClassManag
                         No hay clases programadas para este curso.
                     </div>
                 ) : (
-                    classes.map((item) => (
-                        <div 
-                            key={item.id} 
-                            className="bg-neutral-900 border border-neutral-800 p-4 rounded-lg hover:border-neutral-700 transition-colors flex justify-between items-start group"
-                        >
-                            <div>
-                                <h3 className="text-lg font-bold text-gray-100">{item.title}</h3>
-                                <p className="text-sm text-indigo-400 mb-2">
-                                    {new Date(item.date).toLocaleString()}
-                                </p>
-                                <p className="text-gray-400 text-sm">{item.description}</p>
-                                
-                                <ResourceList classId={item.id} />
-                            </div>
-                            
-                            <button 
-                                onClick={() => handleDelete(item.id)}
-                                className="text-red-500 opacity-0 group-hover:opacity-100 hover:text-red-400 text-sm px-3 py-1 transition-opacity"
+                    classes.map((item) => {
+                        const sprintTitle = getSprintTitle(item.sprint_id)
+                        
+                        return (
+                            <div 
+                                key={item.id} 
+                                className="bg-neutral-900 border border-neutral-800 p-4 rounded-lg hover:border-neutral-700 transition-colors flex justify-between items-start group"
                             >
-                                Eliminar
-                            </button>
-                        </div>
-                    ))
+                                <div>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <h3 className="text-lg font-bold text-gray-100">{item.title}</h3>
+                                        {sprintTitle && (
+                                            <span className="text-xs bg-indigo-900/50 text-indigo-300 px-2 py-0.5 rounded border border-indigo-800">
+                                                {sprintTitle}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-sm text-indigo-400 mb-2">
+                                        {new Date(item.date).toLocaleString()}
+                                    </p>
+                                    <p className="text-gray-400 text-sm">{item.description}</p>
+                                    
+                                    <ResourceList classId={item.id} />
+                                </div>
+                                
+                                <button 
+                                    onClick={() => handleDelete(item.id)}
+                                    className="text-red-500 opacity-0 group-hover:opacity-100 hover:text-red-400 text-sm px-3 py-1 transition-opacity"
+                                >
+                                    Eliminar
+                                </button>
+                            </div>
+                        )
+                    })
                 )}
             </div>
         </div>

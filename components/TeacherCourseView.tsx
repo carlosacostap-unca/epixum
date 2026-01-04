@@ -66,6 +66,18 @@ export default function TeacherCourseView({
                         Sprints
                     </button>
                 )}
+                {hasSprints && (
+                    <button
+                        onClick={() => setActiveTab('reviews')}
+                        className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
+                            activeTab === 'reviews' 
+                                ? 'border-indigo-500 text-indigo-400' 
+                                : 'border-transparent text-gray-400 hover:text-gray-200'
+                        }`}
+                    >
+                        Revisiones
+                    </button>
+                )}
                 {hasTeams && (
                     <button
                         onClick={() => setActiveTab('teams')}
@@ -111,6 +123,7 @@ export default function TeacherCourseView({
                 <SprintManagement
                     courseId={courseId}
                     initialSprints={initialSprints}
+                    initialClasses={initialClasses}
                 />
             )}
 

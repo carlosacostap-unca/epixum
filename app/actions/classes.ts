@@ -65,17 +65,32 @@ export async function getClasses(courseId: string) {
     }
 }
 
-export async function createClass(courseId: string, title: string, description: string, date: string) {
+export async function createClass(courseId: string, title: string, description: string, date: string, sprintId: string | null = null) {
     try {
-        const { supabase } = await checkAuth()
+        const { user } = await checkAuth()
+        const adminClient = getAdminClient()
 
-        const { error } = await supabase
+        // Verify teacher enrollment
+        const { data: teacherEnrollment, error: authError } = await adminClient
+            .from('course_enrollments')
+            .select('id')
+            .eq('course_id', courseId)
+            .ilike('email', user.email!)
+            .eq('role', 'docente')
+            .single()
+
+        if (authError || !teacherEnrollment) {
+            throw new Error('No tienes permiso para crear clases en este curso')
+        }
+
+        const { error } = await adminClient
             .from('classes')
             .insert({
                 course_id: courseId,
                 title,
                 description,
-                date
+                date,
+                sprint_id: sprintId || null
             })
 
         if (error) throw error
@@ -89,12 +104,27 @@ export async function createClass(courseId: string, title: string, description: 
 
 export async function deleteClass(classId: string, courseId: string) {
     try {
-        const { supabase } = await checkAuth()
+        const { user } = await checkAuth()
+        const adminClient = getAdminClient()
 
-        const { error } = await supabase
+        // Verify teacher enrollment
+        const { data: teacherEnrollment, error: authError } = await adminClient
+            .from('course_enrollments')
+            .select('id')
+            .eq('course_id', courseId)
+            .ilike('email', user.email!)
+            .eq('role', 'docente')
+            .single()
+
+        if (authError || !teacherEnrollment) {
+            throw new Error('No tienes permiso para eliminar clases en este curso')
+        }
+
+        const { error } = await adminClient
             .from('classes')
             .delete()
             .eq('id', classId)
+            .eq('course_id', courseId)
 
         if (error) throw error
         

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getClassResources, createResource, deleteResource } from '@/app/actions/resources'
+import { getClassResources, createResource, deleteResource, getSignedUploadUrl } from '@/app/actions/resources'
 import { createClient } from '@/utils/supabase/client'
 
 interface Resource {
@@ -57,17 +57,26 @@ export default function ResourceList({ classId }: ResourceListProps) {
                 const supabase = createClient()
                 const fileExt = file.name.split('.').pop()
                 const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
-                const filePath = `${classId}/${fileName}`
+                
+                // 1. Get Signed URL from server (bypassing RLS)
+                const signedResult = await getSignedUploadUrl(classId, fileName)
+                if (!signedResult.success || !signedResult.data) {
+                    throw new Error(signedResult.error || 'No se pudo obtener URL de subida')
+                }
 
+                const { signedUrl, path, token } = signedResult.data
+
+                // 2. Upload to Signed URL
                 const { error: uploadError } = await supabase.storage
                     .from('class-resources')
-                    .upload(filePath, file)
+                    .uploadToSignedUrl(path, token, file)
 
                 if (uploadError) throw uploadError
 
+                // 3. Get Public URL
                 const { data: { publicUrl } } = supabase.storage
                     .from('class-resources')
-                    .getPublicUrl(filePath)
+                    .getPublicUrl(path)
                 
                 finalUrl = publicUrl
                 finalType = 'doc' // Default to doc for uploads

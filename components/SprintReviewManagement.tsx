@@ -1,14 +1,16 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createSprintReview, getSprintReviews, deleteSprintReview } from '@/app/actions/sprint-reviews'
+import { createReviewSlots, getSprintReviews, deleteSprintReview, updateReviewDetails } from '@/app/actions/sprint-reviews'
 
 type Review = {
     id: string
     sprint_id: string
-    student_email: string
+    student_email: string | null
     start_date: string
     end_date: string
+    comments?: string | null
+    result?: string | null
     sprints?: {
         title: string
     }
@@ -36,6 +38,7 @@ export default function SprintReviewManagement({
 }) {
     const [reviews, setReviews] = useState<Review[]>([])
     const [isCreating, setIsCreating] = useState(false)
+    const [selectedReview, setSelectedReview] = useState<Review | null>(null)
     const [isLoading, setIsLoading] = useState(false)
 
     useEffect(() => {
@@ -46,12 +49,15 @@ export default function SprintReviewManagement({
         const result = await getSprintReviews(courseId)
         if (result.success && result.data) {
             setReviews(result.data)
+        } else if (!result.success) {
+            console.error('Error fetching reviews:', result.error)
+            alert('Error al cargar las revisiones: ' + result.error)
         }
     }
 
     async function handleCreate(formData: FormData) {
         setIsLoading(true)
-        const result = await createSprintReview(formData)
+        const result = await createReviewSlots(formData)
         setIsLoading(false)
 
         if (result.success) {
@@ -62,8 +68,31 @@ export default function SprintReviewManagement({
         }
     }
 
+    async function handleUpdate(formData: FormData) {
+        if (!selectedReview) return
+
+        setIsLoading(true)
+        const studentEmail = formData.get('studentEmail') as string
+        const comments = formData.get('comments') as string
+        const result = formData.get('result') as string
+        
+        const res = await updateReviewDetails(courseId, selectedReview.id, {
+            studentEmail: studentEmail || null,
+            comments: comments || null,
+            result: result || null
+        })
+        
+        setIsLoading(false)
+        if (res.success) {
+            setSelectedReview(null)
+            loadReviews()
+        } else {
+            alert(res.error)
+        }
+    }
+
     async function handleDelete(reviewId: string) {
-        if (!confirm('¿Estás seguro de eliminar esta revisión?')) return
+        if (!confirm('¿Estás seguro de eliminar este turno de revisión?')) return
 
         const result = await deleteSprintReview(reviewId, courseId)
         if (result.success) {
@@ -82,19 +111,19 @@ export default function SprintReviewManagement({
                         onClick={() => setIsCreating(true)}
                         className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
                     >
-                        + Nueva Revisión
+                        + Nuevos Turnos
                     </button>
                 )}
             </div>
 
             {isCreating && (
                 <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6 mb-6">
-                    <h3 className="text-lg font-bold text-gray-100 mb-4">Programar Revisión</h3>
+                    <h3 className="text-lg font-bold text-gray-100 mb-4">Generar Turnos de Revisión</h3>
                     <form action={handleCreate} className="flex flex-col gap-4">
                         <input type="hidden" name="courseId" value={courseId} />
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
+                            <div className="md:col-span-2">
                                 <label className="block text-xs text-gray-500 mb-1">Sprint</label>
                                 <select 
                                     name="sprintId"
@@ -109,43 +138,39 @@ export default function SprintReviewManagement({
                             </div>
 
                             <div>
-                                <label className="block text-xs text-gray-500 mb-1">Estudiante</label>
-                                <select 
-                                    name="studentEmail"
+                                <label className="block text-xs text-gray-500 mb-1">Fecha y Hora de Inicio</label>
+                                <input 
+                                    type="datetime-local"
+                                    name="startTime"
                                     className="bg-neutral-950 border border-neutral-700 rounded px-3 py-2 text-sm text-white w-full focus:outline-none focus:border-indigo-500"
                                     required
-                                >
-                                    <option value="">Seleccionar Estudiante</option>
-                                    {students.map(s => (
-                                        <option key={s.email} value={s.email}>
-                                            {s.first_name && s.last_name 
-                                                ? `${s.first_name} ${s.last_name} (${s.email})`
-                                                : s.email
-                                            }
-                                        </option>
-                                    ))}
-                                </select>
+                                />
                             </div>
-                        </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-xs text-gray-500 mb-1">Inicio</label>
-                                <input 
-                                    type="datetime-local"
-                                    name="startDate"
-                                    className="bg-neutral-950 border border-neutral-700 rounded px-3 py-2 text-sm text-white w-full focus:outline-none focus:border-indigo-500"
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs text-gray-500 mb-1">Fin</label>
-                                <input 
-                                    type="datetime-local"
-                                    name="endDate"
-                                    className="bg-neutral-950 border border-neutral-700 rounded px-3 py-2 text-sm text-white w-full focus:outline-none focus:border-indigo-500"
-                                    required
-                                />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs text-gray-500 mb-1">Cant. Turnos</label>
+                                    <input 
+                                        type="number"
+                                        name="count"
+                                        min="1"
+                                        defaultValue="1"
+                                        className="bg-neutral-950 border border-neutral-700 rounded px-3 py-2 text-sm text-white w-full focus:outline-none focus:border-indigo-500"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-gray-500 mb-1">Duración (min)</label>
+                                    <input 
+                                        type="number"
+                                        name="duration"
+                                        min="5"
+                                        step="5"
+                                        defaultValue="15"
+                                        className="bg-neutral-950 border border-neutral-700 rounded px-3 py-2 text-sm text-white w-full focus:outline-none focus:border-indigo-500"
+                                        required
+                                    />
+                                </div>
                             </div>
                         </div>
 
@@ -162,7 +187,7 @@ export default function SprintReviewManagement({
                                 disabled={isLoading}
                                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors disabled:opacity-50"
                             >
-                                {isLoading ? 'Guardando...' : 'Guardar Revisión'}
+                                {isLoading ? 'Generando...' : 'Generar Turnos'}
                             </button>
                         </div>
                     </form>
@@ -175,51 +200,147 @@ export default function SprintReviewManagement({
                         No hay revisiones programadas
                     </div>
                 ) : (
-                    reviews.map(review => {
-                        const student = students.find(s => s.email === review.student_email)
-                        const studentName = student 
-                            ? (student.first_name && student.last_name ? `${student.first_name} ${student.last_name}` : student.email)
-                            : review.student_email
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {reviews.map(review => {
+                            const isBooked = !!review.student_email
+                            const student = isBooked ? students.find(s => s.email === review.student_email) : null
+                            const studentName = student 
+                                ? (student.first_name && student.last_name ? `${student.first_name} ${student.last_name}` : student.email)
+                                : (review.student_email || 'Disponible')
 
-                        return (
-                            <div key={review.id} className="bg-neutral-900 border border-neutral-800 rounded-lg p-4 hover:border-neutral-700 transition-colors">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className="text-xs font-medium text-indigo-400 bg-indigo-900/30 px-2 py-0.5 rounded">
-                                                {review.sprints?.title || 'Sprint desconocido'}
-                                            </span>
-                                            <span className="text-gray-400 text-sm">•</span>
-                                            <span className="text-gray-200 font-medium text-sm">
-                                                {studentName}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-4 text-xs text-gray-500 mt-2">
-                                            <div className="flex items-center gap-1">
-                                                <span className="w-2 h-2 rounded-full bg-green-500/50"></span>
-                                                Inicio: {new Date(review.start_date).toLocaleString()}
-                                            </div>
-                                            <div className="flex items-center gap-1">
-                                                <span className="w-2 h-2 rounded-full bg-red-500/50"></span>
-                                                Fin: {new Date(review.end_date).toLocaleString()}
-                                            </div>
-                                        </div>
-                                    </div>
+                            return (
+                                <div 
+                                    key={review.id} 
+                                    onClick={() => setSelectedReview(review)}
+                                    className={`border rounded-lg p-3 transition-colors cursor-pointer relative group ${
+                                        isBooked 
+                                            ? 'bg-neutral-900 border-indigo-900/30 hover:border-indigo-500/50' 
+                                            : 'bg-neutral-900/50 border-neutral-800 border-dashed hover:border-neutral-600'
+                                    }`}
+                                >
                                     <button 
-                                        onClick={() => handleDelete(review.id)}
-                                        className="text-gray-500 hover:text-red-400 p-1 rounded hover:bg-neutral-800 transition-colors"
-                                        title="Eliminar revisión"
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            handleDelete(review.id)
+                                        }}
+                                        className="absolute top-2 right-2 text-gray-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        title="Eliminar turno"
                                     >
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M3 6h18"></path>
+                                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
                                         </svg>
                                     </button>
+
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div className="text-xs text-gray-500 font-medium bg-neutral-950 px-2 py-1 rounded">
+                                            {new Date(review.start_date).toLocaleDateString()}
+                                        </div>
+                                        {review.result && (
+                                            <div className={`text-xs px-2 py-1 rounded capitalize ${
+                                                review.result === 'aprobado' ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'
+                                            }`}>
+                                                {review.result}
+                                            </div>
+                                        )}
+                                    </div>
+                                    
+                                    <div className="mb-3">
+                                        <div className="text-sm font-medium text-gray-200 mb-1">
+                                            {new Date(review.start_date).toLocaleDateString()}
+                                        </div>
+                                        <div className="text-xs text-gray-400 flex items-center gap-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <circle cx="12" cy="12" r="10"></circle>
+                                                <polyline points="12 6 12 12 16 14"></polyline>
+                                            </svg>
+                                            {new Date(review.start_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - {new Date(review.end_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                        </div>
+                                    </div>
+
+                                    <div className={`text-sm px-3 py-2 rounded flex items-center gap-2 ${
+                                        isBooked ? 'bg-indigo-950/30 text-indigo-200' : 'bg-neutral-800 text-gray-500'
+                                    }`}>
+                                        <div className={`w-2 h-2 rounded-full ${isBooked ? 'bg-indigo-500' : 'bg-green-500'}`}></div>
+                                        <span className="truncate" title={studentName || ''}>
+                                            {studentName}
+                                        </span>
+                                    </div>
                                 </div>
-                            </div>
-                        )
-                    })
+                            )
+                        })}
+                    </div>
                 )}
             </div>
+
+            {/* Edit Modal */}
+            {selectedReview && (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                    <div className="bg-neutral-900 border border-neutral-800 rounded-lg w-full max-w-md p-6">
+                        <h3 className="text-lg font-medium text-white mb-4">Detalles de la Revisión</h3>
+                        
+                        <form action={handleUpdate} className="space-y-4">
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">Estudiante</label>
+                                <select 
+                                    name="studentEmail" 
+                                    defaultValue={selectedReview.student_email || ''}
+                                    className="bg-neutral-950 border border-neutral-700 rounded px-3 py-2 text-sm text-white w-full focus:outline-none focus:border-indigo-500"
+                                >
+                                    <option value="">-- Sin Asignar --</option>
+                                    {students.map(s => (
+                                        <option key={s.email} value={s.email}>
+                                            {s.first_name} {s.last_name} ({s.email})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">Resultado</label>
+                                <select 
+                                    name="result" 
+                                    defaultValue={selectedReview.result || ''}
+                                    className="bg-neutral-950 border border-neutral-700 rounded px-3 py-2 text-sm text-white w-full focus:outline-none focus:border-indigo-500"
+                                >
+                                    <option value="">-- Pendiente --</option>
+                                    <option value="aprobado">Aprobado</option>
+                                    <option value="reprobado">Reprobado</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">Comentarios</label>
+                                <textarea 
+                                    name="comments" 
+                                    defaultValue={selectedReview.comments || ''}
+                                    rows={4}
+                                    className="bg-neutral-950 border border-neutral-700 rounded px-3 py-2 text-sm text-white w-full focus:outline-none focus:border-indigo-500"
+                                    placeholder="Comentarios sobre la revisión..."
+                                />
+                            </div>
+
+                            <div className="flex gap-2 justify-end pt-2">
+                                <button 
+                                    type="button" 
+                                    onClick={() => setSelectedReview(null)}
+                                    className="px-4 py-2 text-sm text-gray-400 hover:text-white"
+                                >
+                                    Cancelar
+                                </button>
+                                <button 
+                                    type="submit" 
+                                    disabled={isLoading}
+                                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-4 py-2 rounded"
+                                >
+                                    {isLoading ? 'Guardando...' : 'Guardar Cambios'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

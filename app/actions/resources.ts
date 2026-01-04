@@ -86,9 +86,34 @@ export async function getStudentClassResources(classId: string) {
 
 export async function createResource(classId: string, title: string, url: string, type: string = 'link') {
     try {
-        const { supabase } = await checkAuth()
+        const { user } = await checkAuth()
+        const adminClient = getAdminClient()
 
-        const { error } = await supabase
+        // 1. Get course_id from class
+        const { data: classData, error: classError } = await adminClient
+            .from('classes')
+            .select('course_id')
+            .eq('id', classId)
+            .single()
+
+        if (classError || !classData) {
+            throw new Error('Clase no encontrada')
+        }
+
+        // 2. Verify teacher enrollment
+        const { data: teacherEnrollment, error: authError } = await adminClient
+            .from('course_enrollments')
+            .select('id')
+            .eq('course_id', classData.course_id)
+            .ilike('email', user.email!)
+            .eq('role', 'docente')
+            .single()
+
+        if (authError || !teacherEnrollment) {
+            throw new Error('No tienes permiso para agregar recursos en este curso')
+        }
+
+        const { error } = await adminClient
             .from('class_resources')
             .insert({
                 class_id: classId,
@@ -102,6 +127,7 @@ export async function createResource(classId: string, title: string, url: string
         // We don't know the courseId here easily without fetching, so we might need to rely on client refresh 
         // or just revalidate a general path if possible, but path revalidation requires courseId.
         // We will return success and let client handle UI update.
+        revalidatePath(`/teacher/courses/${classData.course_id}`)
         return { success: true }
     } catch (error: unknown) {
         return { success: false, error: (error as Error).message }
@@ -110,16 +136,96 @@ export async function createResource(classId: string, title: string, url: string
 
 export async function deleteResource(resourceId: string) {
     try {
-        const { supabase } = await checkAuth()
+        const { user } = await checkAuth()
+        const adminClient = getAdminClient()
 
-        const { error } = await supabase
+        // 1. Get resource details to find course info
+        const { data: resource, error: resError } = await adminClient
+            .from('class_resources')
+            .select('class_id')
+            .eq('id', resourceId)
+            .single()
+
+        if (resError || !resource) {
+            throw new Error('Recurso no encontrado')
+        }
+
+        const { data: classData, error: classError } = await adminClient
+            .from('classes')
+            .select('course_id')
+            .eq('id', resource.class_id)
+            .single()
+
+        if (classError || !classData) {
+            throw new Error('Clase asociada no encontrada')
+        }
+
+        // 2. Verify teacher enrollment
+        const { data: teacherEnrollment, error: authError } = await adminClient
+            .from('course_enrollments')
+            .select('id')
+            .eq('course_id', classData.course_id)
+            .ilike('email', user.email!)
+            .eq('role', 'docente')
+            .single()
+
+        if (authError || !teacherEnrollment) {
+            throw new Error('No tienes permiso para eliminar recursos en este curso')
+        }
+
+        const { error } = await adminClient
             .from('class_resources')
             .delete()
             .eq('id', resourceId)
 
         if (error) throw error
         
+        revalidatePath(`/teacher/courses/${classData.course_id}`)
         return { success: true }
+    } catch (error: unknown) {
+        return { success: false, error: (error as Error).message }
+    }
+}
+
+export async function getSignedUploadUrl(classId: string, fileName: string) {
+    try {
+        const { user } = await checkAuth()
+        const adminClient = getAdminClient()
+
+        // 1. Get course_id from class
+        const { data: classData, error: classError } = await adminClient
+            .from('classes')
+            .select('course_id')
+            .eq('id', classId)
+            .single()
+
+        if (classError || !classData) {
+            throw new Error('Clase no encontrada')
+        }
+
+        // 2. Verify teacher enrollment
+        const { data: teacherEnrollment, error: authError } = await adminClient
+            .from('course_enrollments')
+            .select('id')
+            .eq('course_id', classData.course_id)
+            .ilike('email', user.email!)
+            .eq('role', 'docente')
+            .single()
+
+        if (authError || !teacherEnrollment) {
+            throw new Error('No tienes permiso para subir archivos en este curso')
+        }
+
+        // 3. Create signed upload URL
+        const filePath = `${classId}/${fileName}`
+        const { data, error } = await adminClient
+            .storage
+            .from('class-resources')
+            .createSignedUploadUrl(filePath)
+
+        if (error) throw error
+
+        return { success: true, data: { ...data, path: filePath } }
     } catch (error: unknown) {
         return { success: false, error: (error as Error).message }
     }

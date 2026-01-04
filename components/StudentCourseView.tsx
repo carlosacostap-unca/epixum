@@ -5,6 +5,7 @@ import StudentClassView from './StudentClassView'
 import StudentAssignmentList from './StudentAssignmentList'
 import SprintList from './SprintList'
 import StudentTeamView from './StudentTeamView'
+import StudentReviewManagement from './StudentReviewManagement'
 
 interface ClassItem {
     id: string
@@ -86,6 +87,18 @@ export default function StudentCourseView({
                         Sprints
                     </button>
                 )}
+                {hasSprints && (
+                    <button
+                        onClick={() => setActiveTab('reviews')}
+                        className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
+                            activeTab === 'reviews' 
+                                ? 'border-indigo-500 text-indigo-400' 
+                                : 'border-transparent text-gray-400 hover:text-gray-200'
+                        }`}
+                    >
+                        Revisiones
+                    </button>
+                )}
                 {hasTeams && (
                     <button
                         onClick={() => setActiveTab('teams')}
@@ -111,11 +124,19 @@ export default function StudentCourseView({
             </div>
 
             {activeTab === 'classes' && hasClasses && (
-                <StudentClassView courseId={courseId} classes={classes} />
+                <StudentClassView courseId={courseId} classes={classes} sprints={initialSprints} />
             )}
             
             {activeTab === 'sprints' && hasSprints && (
                 <SprintList courseId={courseId} initialSprints={initialSprints} />
+            )}
+
+            {activeTab === 'reviews' && hasSprints && (
+                <StudentReviewManagement 
+                    courseId={courseId} 
+                    currentUserEmail={currentUserEmail}
+                    sprints={initialSprints}
+                />
             )}
 
             {activeTab === 'teams' && hasTeams && (
