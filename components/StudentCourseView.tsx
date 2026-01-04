@@ -128,7 +128,11 @@ export default function StudentCourseView({
             )}
             
             {activeTab === 'sprints' && hasSprints && (
-                <SprintList courseId={courseId} initialSprints={initialSprints} />
+                <SprintList 
+                    courseId={courseId} 
+                    initialSprints={initialSprints} 
+                    classes={classes}
+                />
             )}
 
             {activeTab === 'reviews' && hasSprints && (

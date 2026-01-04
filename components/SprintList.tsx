@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { getSprints } from '@/app/actions/sprints'
+import StudentClassView from './StudentClassView'
 
 type Sprint = {
     id: string
@@ -11,13 +12,36 @@ type Sprint = {
     end_date: string
 }
 
-export default function SprintList({ courseId, initialSprints = [] }: { courseId: string, initialSprints?: Sprint[] }) {
+interface ClassItem {
+    id: string
+    title: string
+    description: string
+    date: string
+    sprint_id?: string | null
+}
+
+export default function SprintList({ 
+    courseId, 
+    initialSprints = [], 
+    classes = [] 
+}: { 
+    courseId: string, 
+    initialSprints?: Sprint[],
+    classes?: ClassItem[]
+}) {
     const [sprints, setSprints] = useState<Sprint[]>(initialSprints)
+    const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null)
     const [isLoading, setIsLoading] = useState(false)
 
     useEffect(() => {
         if (initialSprints.length === 0) {
             loadSprints()
+        } else {
+            setSprints(initialSprints)
+            // Select first sprint by default if none selected and sprints exist
+            if (initialSprints.length > 0 && !selectedSprintId) {
+                setSelectedSprintId(initialSprints[0].id)
+            }
         }
     }, [initialSprints])
 
@@ -26,8 +50,21 @@ export default function SprintList({ courseId, initialSprints = [] }: { courseId
         const result = await getSprints(courseId)
         if (result.success && result.data) {
             setSprints(result.data)
+            if (result.data.length > 0 && !selectedSprintId) {
+                setSelectedSprintId(result.data[0].id)
+            }
         }
         setIsLoading(false)
+    }
+
+    const selectedSprint = sprints.find(s => s.id === selectedSprintId)
+    const filteredClasses = selectedSprint ? classes.filter(c => c.sprint_id === selectedSprint.id) : []
+
+    // Format dates for display (YYYY-MM-DD -> DD/MM/YYYY)
+    const formatDate = (dateStr: string) => {
+        if (!dateStr) return ''
+        const [year, month, day] = dateStr.split('-')
+        return `${day}/${month}/${year}`
     }
 
     return (
@@ -54,65 +91,58 @@ export default function SprintList({ courseId, initialSprints = [] }: { courseId
                     </p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 gap-4">
-                    {sprints.map(sprint => {
-                        // Get current date in the configured timezone (YYYY-MM-DD)
-                        const timezone = process.env.NEXT_PUBLIC_TIMEZONE || 'UTC'
-                        const nowInTz = new Date().toLocaleDateString('en-CA', { timeZone: timezone })
-                        
-                        const start = sprint.start_date
-                        const end = sprint.end_date
-                        
-                        const isActive = nowInTz >= start && nowInTz <= end
-                        const isPast = nowInTz > end
-                        const isFuture = nowInTz < start
+                <>
+                    {/* Sprint Tabs */}
+                    <div className="flex gap-2 overflow-x-auto pb-4 mb-6 border-b border-neutral-800 scrollbar-thin scrollbar-thumb-neutral-700">
+                        {sprints.map(sprint => (
+                            <button
+                                key={sprint.id}
+                                onClick={() => setSelectedSprintId(sprint.id)}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                                    selectedSprintId === sprint.id
+                                        ? 'bg-indigo-600 text-white'
+                                        : 'bg-neutral-900 text-gray-400 hover:text-gray-200 hover:bg-neutral-800'
+                                }`}
+                            >
+                                {sprint.title}
+                            </button>
+                        ))}
+                    </div>
 
-                        // Format dates for display (YYYY-MM-DD -> DD/MM/YYYY)
-                        const formatDate = (dateStr: string) => {
-                            const [year, month, day] = dateStr.split('-')
-                            return `${day}/${month}/${year}`
-                        }
-
-                        return (
-                            <div key={sprint.id} className={`bg-neutral-900 border rounded-lg p-6 flex flex-col md:flex-row justify-between gap-4 transition-all ${isActive ? 'border-indigo-500 shadow-lg shadow-indigo-900/20' : 'border-neutral-800 hover:border-neutral-700'}`}>
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <h3 className={`text-xl font-bold ${isActive ? 'text-white' : 'text-gray-200'}`}>{sprint.title}</h3>
-                                        {isActive && (
-                                            <span className="bg-indigo-900/50 text-indigo-300 text-xs px-2 py-1 rounded border border-indigo-700 font-medium">
-                                                En curso
-                                            </span>
-                                        )}
-                                        {isFuture && (
-                                            <span className="bg-neutral-800 text-gray-400 text-xs px-2 py-1 rounded border border-neutral-700 font-medium">
-                                                Próximo
-                                            </span>
-                                        )}
-                                        {isPast && (
-                                            <span className="bg-neutral-950 text-gray-500 text-xs px-2 py-1 rounded border border-neutral-800 font-medium">
-                                                Finalizado
-                                            </span>
-                                        )}
+                    {/* Selected Sprint Content */}
+                    {selectedSprint && (
+                        <div className="space-y-6">
+                            <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6">
+                                <h3 className="text-2xl font-bold text-white mb-2">{selectedSprint.title}</h3>
+                                {selectedSprint.description && (
+                                    <p className="text-gray-400 mb-4">{selectedSprint.description}</p>
+                                )}
+                                
+                                <div className="flex gap-6 text-sm text-gray-500 font-mono bg-black/20 p-3 rounded-md inline-flex border border-neutral-800/50">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+                                        <span>Inicio: {formatDate(selectedSprint.start_date)}</span>
                                     </div>
-                                    {sprint.description && (
-                                        <p className="text-gray-400 text-sm mb-4 leading-relaxed">{sprint.description}</p>
-                                    )}
-                                    
-                                    <div className="flex gap-6 text-sm text-gray-500 font-mono bg-black/20 p-3 rounded-md inline-flex border border-neutral-800/50">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
-                                            <span>Inicio: {formatDate(start)}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
-                                            <span>Fin: {formatDate(end)}</span>
-                                        </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
+                                        <span>Fin: {formatDate(selectedSprint.end_date)}</span>
                                     </div>
                                 </div>
                             </div>
-                        )
-                    })}
-                </div>
+
+                            <div className="pt-4">
+                                <h4 className="text-lg font-semibold text-gray-200 mb-4">Clases y Recursos</h4>
+                                {filteredClasses.length > 0 ? (
+                                    <StudentClassView courseId={courseId} classes={filteredClasses} sprints={sprints} />
+                                ) : (
+                                    <div className="text-center py-12 text-gray-500 bg-neutral-900/50 rounded-lg border border-neutral-800/50">
+                                        No hay clases publicadas en este sprint.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </>
             )}
         </div>
     )
