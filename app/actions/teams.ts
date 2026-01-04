@@ -229,13 +229,46 @@ export async function getStudentTeam(courseId: string) {
             .select('email, first_name, last_name')
             .in('email', emails)
 
-        // Merge profiles with members
+        // 1. Fetch assignments for the course (to calculate progress)
+        const { data: assignments, error: assignmentsError } = await supabase
+            .from('assignments')
+            .select('id, title, due_date')
+            .eq('course_id', courseId)
+            .order('due_date', { ascending: true })
+            
+        if (assignmentsError) throw assignmentsError
+
+        // 2. Fetch submissions for all team members
+        const { data: submissions, error: submissionsError } = await supabase
+            .from('assignment_submissions')
+            .select('assignment_id, student_email, grade, submitted_at')
+            .in('student_email', emails)
+            .in('assignment_id', assignments.map(a => a.id))
+
+        if (submissionsError) throw submissionsError
+
+        // Merge profiles with members and progress
         const membersWithProfiles = members.map(m => {
             const profile = profiles?.find(p => p.email === m.email)
+            const memberSubmissions = submissions?.filter(s => s.student_email === m.email) || []
+            
+            // Map submissions to assignments to show status
+            const progress = assignments.map(assignment => {
+                const sub = memberSubmissions.find(s => s.assignment_id === assignment.id)
+                return {
+                    assignment_id: assignment.id,
+                    assignment_title: assignment.title,
+                    status: sub ? (sub.grade ? 'Calificado' : 'Entregado') : 'Pendiente',
+                    grade: sub?.grade,
+                    submitted_at: sub?.submitted_at
+                }
+            })
+
             return {
                 email: m.email,
                 first_name: profile?.first_name,
-                last_name: profile?.last_name
+                last_name: profile?.last_name,
+                progress // New field
             }
         })
 
