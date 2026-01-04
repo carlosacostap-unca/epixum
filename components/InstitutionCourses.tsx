@@ -94,7 +94,7 @@ export default function InstitutionCourses({ institutionId, institutionName, onB
         
         if (res.success) {
             // Refresh enrollments
-            const enrollRes = await getCourseEnrollments(selectedCourse.id)
+            const enrollRes = await getCourseNodocentes(selectedCourse.id)
             if (enrollRes.success && enrollRes.data) {
                 setEnrollments(enrollRes.data)
             }
@@ -103,13 +103,13 @@ export default function InstitutionCourses({ institutionId, institutionName, onB
         }
     }
 
-    async function handleRemoveEnrollment(id: string) {
+    async function handleRemoveEnrollment(email: string) {
         if (!selectedCourse) return
         if (!confirm('¿Estás seguro de quitar este usuario del curso?')) return
         
-        const res = await removeEnrollment(id)
+        const res = await removeNodocenteFromCourse(selectedCourse.id, email)
         if (res.success) {
-             const enrollRes = await getCourseEnrollments(selectedCourse.id)
+             const enrollRes = await getCourseNodocentes(selectedCourse.id)
             if (enrollRes.success && enrollRes.data) {
                 setEnrollments(enrollRes.data)
             }
