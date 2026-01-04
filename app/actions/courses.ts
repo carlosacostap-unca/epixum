@@ -371,7 +371,7 @@ export async function getTeacherCourses() {
                 // @ts-ignore
                 institution_name: course.instituciones?.nombre
             }
-        }).filter(Boolean)
+        }).filter((item) => item !== null) as any
 
         return { success: true, data: courses }
     } catch (error: unknown) {
@@ -433,7 +433,7 @@ export async function getNodocenteCourses() {
                 // @ts-ignore
                 institution_name: course.instituciones?.nombre
             }
-        }).filter(Boolean)
+        }).filter((item) => item !== null) as any
 
         return { success: true, data: courses }
     } catch (error: unknown) {
@@ -621,7 +621,7 @@ export async function getStudentCourses() {
                 // @ts-ignore
                 institution_name: course.instituciones?.nombre
             }
-        }).filter(Boolean)
+        }).filter((item) => item !== null) as any
 
         return { success: true, data: courses }
     } catch (error: unknown) {
