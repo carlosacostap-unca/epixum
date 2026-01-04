@@ -96,14 +96,33 @@ export async function getCourseStudentsForTeacher(courseId: string) {
     try {
         const { supabase } = await checkTeacherCourseAccess(courseId)
         
-        const { data, error } = await supabase
+        const { data: enrollments, error } = await supabase
             .from('course_enrollments')
             .select('*')
             .eq('course_id', courseId)
             .in('role', ['estudiante', 'alumno'])
             
         if (error) throw error
-        return { success: true, data }
+
+        if (!enrollments || enrollments.length === 0) return { success: true, data: [] }
+
+        const emails = enrollments.map(e => e.email)
+        
+        const { data: profiles } = await supabase
+            .from('profiles')
+            .select('email, first_name, last_name')
+            .in('email', emails)
+            
+        const studentsWithProfiles = enrollments.map(e => {
+            const profile = profiles?.find(p => p.email === e.email)
+            return {
+                ...e,
+                first_name: profile?.first_name,
+                last_name: profile?.last_name
+            }
+        })
+
+        return { success: true, data: studentsWithProfiles }
     } catch (error: unknown) {
         return { success: false, error: (error as Error).message }
     }

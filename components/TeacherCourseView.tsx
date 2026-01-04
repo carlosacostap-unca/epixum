@@ -5,6 +5,7 @@ import ClassManagement from './ClassManagement'
 import AssignmentManagement from './AssignmentManagement'
 import TeacherStudentManagement from './TeacherStudentManagement'
 import SprintManagement from './SprintManagement'
+import SprintReviewManagement from './SprintReviewManagement'
 import TeamManagement from './TeamManagement'
 
 interface TeacherCourseViewProps {
@@ -110,6 +111,14 @@ export default function TeacherCourseView({
                 <SprintManagement
                     courseId={courseId}
                     initialSprints={initialSprints}
+                />
+            )}
+
+            {activeTab === 'reviews' && hasSprints && (
+                <SprintReviewManagement
+                    courseId={courseId}
+                    sprints={initialSprints}
+                    students={initialTeamStudents}
                 />
             )}
 
