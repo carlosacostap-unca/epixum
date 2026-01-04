@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getCourses, createCourse, getNodocenteUsers, enrollNodocente, getCourseEnrollments, removeEnrollment } from '@/app/actions/courses'
+import { getCourses, createCourse, getNodocenteUsers, enrollNodocente, getCourseNodocentes, removeNodocenteFromCourse } from '@/app/actions/courses'
 
 interface Course {
     id: string
@@ -71,7 +71,7 @@ export default function InstitutionCourses({ institutionId, institutionName, onB
         
         // Load enrollments and available users in parallel
         const [enrollRes, usersRes] = await Promise.all([
-            getCourseEnrollments(course.id),
+            getCourseNodocentes(course.id),
             getNodocenteUsers()
         ])
         
@@ -146,7 +146,7 @@ export default function InstitutionCourses({ institutionId, institutionName, onB
                                     <li key={enrollment.id} className="flex justify-between items-center bg-neutral-800 p-3 rounded border border-neutral-700">
                                         <span className="text-gray-300">{enrollment.email}</span>
                                         <button 
-                                            onClick={() => handleRemoveEnrollment(enrollment.id)}
+                                            onClick={() => handleRemoveEnrollment(enrollment.email)}
                                             className="text-red-400 hover:text-red-300 text-sm"
                                         >
                                             Quitar
