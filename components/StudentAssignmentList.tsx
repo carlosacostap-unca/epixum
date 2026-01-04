@@ -115,7 +115,7 @@ function AssignmentItem({
             if (file) {
                 const supabase = createClient()
                 const { data: { user } } = await supabase.auth.getUser()
-                if (!user) throw new Error('No user')
+                if (!user || !user.email) throw new Error('Usuario no identificado')
 
                 const fileExt = file.name.split('.').pop()
                 // Sanitize email and title for filename (alphanumeric, dots, dashes, underscores)
