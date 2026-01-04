@@ -1,65 +1,291 @@
-import Image from "next/image";
+import { createClient } from '@/utils/supabase/server'
+import { redirect } from 'next/navigation'
+import InstitutionAdminDashboard from '@/components/InstitutionAdminDashboard'
+import RoleSelectionScreen from '@/components/RoleSelectionScreen'
+import NonTeachingStaffDashboard from '@/components/NonTeachingStaffDashboard'
+import ProfileManager from '@/components/ProfileManager'
+import { getInstitutionsForUser } from '@/app/actions/institutions'
+import { getTeacherCourses, getStudentCourses, getNodocenteCourses } from '@/app/actions/courses'
+import TeacherDashboard from '@/components/TeacherDashboard'
+import StudentDashboard from '@/components/StudentDashboard'
 
-export default function Home() {
+export default async function Home(props: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
+  const searchParams = await props.searchParams
+  const selectedRoleParam = typeof searchParams.role === 'string' ? searchParams.role : undefined
+
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return redirect('/login')
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('roles, first_name, last_name, dni, birth_date, phone')
+    .eq('id', user.id)
+    .single()
+  
+  if (profileError) {
+      console.error('[PAGE] Error fetching profile:', profileError)
+  }
+
+  // Filter out empty roles just in case
+  const roles = (profile?.roles || []).filter((r: string) => r && r.trim() !== '')
+
+  if (roles.length === 0) {
+     return redirect('/login?error=unauthorized_role')
+  }
+
+  // Logic for Role Selection
+  const hasMultipleRoles = roles.length > 1
+  const isValidParamRole = selectedRoleParam && roles.includes(selectedRoleParam)
+
+  // If user has multiple roles and hasn't selected a valid one yet, show selection screen
+  if (hasMultipleRoles && !isValidParamRole) {
+    return <RoleSelectionScreen roles={roles} userEmail={user.email || ''} />
+  }
+
+  // Determine the effective role to show
+  // If valid param is provided, use it. Otherwise (single role), use the first role.
+  const effectiveRole = isValidParamRole ? selectedRoleParam : roles[0]
+
+  // Render Dashboard based on effectiveRole
+  if (effectiveRole === 'admin-plataforma') {
+      return (
+        <div className="flex min-h-screen flex-col items-center p-8 font-[family-name:var(--font-geist-sans)] bg-black">
+          <main className="w-full max-w-4xl flex flex-col gap-8 items-start">
+            <div className="flex justify-between w-full items-center bg-neutral-900 p-6 rounded-lg shadow-sm border border-neutral-800">
+                 <div>
+                    <h1 className="text-3xl font-bold text-gray-100">Panel de Administración</h1>
+                    <p className="text-gray-400 mt-1">
+                        Usuario: <span className="font-medium text-gray-200">{user.email}</span>
+                        <span className="mx-2 text-gray-600">|</span>
+                        Rol: <span className="text-green-400 font-semibold">Administrador de Plataforma</span>
+                    </p>
+                 </div>
+                 <div className="flex gap-4 items-center">
+                    <ProfileManager initialProfile={{
+                        id: user.id,
+                        email: user.email || '',
+                        first_name: profile?.first_name,
+                        last_name: profile?.last_name,
+                        dni: profile?.dni,
+                        birth_date: profile?.birth_date,
+                        phone: profile?.phone,
+                        roles: profile?.roles
+                    }} />
+                    {hasMultipleRoles && (
+                        <a href="/" className="text-sm text-indigo-400 hover:text-indigo-300 hover:underline">
+                            Cambiar Rol
+                        </a>
+                    )}
+                    <form action="/auth/signout" method="post">
+                        <button 
+                            className="bg-neutral-800 text-gray-200 border border-neutral-700 px-4 py-2 rounded-md hover:bg-neutral-700 transition-colors text-sm font-medium"
+                            type="submit"
+                        >
+                            Cerrar Sesión
+                        </button>
+                    </form>
+                 </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+                {/* Card Gestionar Instituciones */}
+                <a href="/admin/institutions" className="block group">
+                    <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6 hover:bg-neutral-800 transition-all h-full flex flex-col justify-between">
+                        <div>
+                            <h2 className="text-xl font-bold text-gray-100 group-hover:text-indigo-400 transition-colors mb-2">
+                                Gestionar Instituciones
+                            </h2>
+                            <p className="text-gray-400">
+                                Crear, editar y eliminar instituciones educativas. Asignar administradores a las instituciones.
+                            </p>
+                        </div>
+                        <div className="mt-4 text-indigo-400 text-sm font-medium group-hover:translate-x-1 transition-transform">
+                            Ir a Instituciones →
+                        </div>
+                    </div>
+                </a>
+
+                {/* Card Gestionar Usuarios */}
+                <a href="/admin/users" className="block group">
+                    <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6 hover:bg-neutral-800 transition-all h-full flex flex-col justify-between">
+                        <div>
+                            <h2 className="text-xl font-bold text-gray-100 group-hover:text-indigo-400 transition-colors mb-2">
+                                Gestionar Usuarios
+                            </h2>
+                            <p className="text-gray-400">
+                                Administrar la lista blanca de usuarios, asignar roles globales y gestionar accesos.
+                            </p>
+                        </div>
+                        <div className="mt-4 text-indigo-400 text-sm font-medium group-hover:translate-x-1 transition-transform">
+                            Ir a Usuarios →
+                        </div>
+                    </div>
+                </a>
+            </div>
+          </main>
+        </div>
+      )
+  }
+
+  if (effectiveRole === 'admin-institucion') {
+      const institutionsResult = await getInstitutionsForUser()
+      const institutions = institutionsResult.success && institutionsResult.data ? institutionsResult.data : []
+      
+      return (
+          <div className="relative">
+             {hasMultipleRoles && (
+                <div className="absolute top-4 right-4 z-50">
+                    <a href="/" className="text-xs text-indigo-400 hover:text-indigo-300 hover:underline bg-black/50 px-2 py-1 rounded">
+                        ← Cambiar Rol
+                    </a>
+                </div>
+             )}
+             <InstitutionAdminDashboard 
+                institutions={institutions}
+                userEmail={user.email || ''}
+                profile={{
+                    id: user.id,
+                    email: user.email || '',
+                    first_name: profile?.first_name,
+                    last_name: profile?.last_name,
+                    dni: profile?.dni,
+                    birth_date: profile?.birth_date,
+                    phone: profile?.phone,
+                    roles: profile?.roles
+                }}
+             />
+          </div>
+      )
+  }
+
+  if (effectiveRole === 'nodocente') {
+      const coursesResult = await getNodocenteCourses()
+      const courses = coursesResult.success && coursesResult.data ? coursesResult.data : []
+
+      return (
+          <div className="relative">
+             {hasMultipleRoles && (
+                <div className="absolute top-4 right-4 z-50">
+                    <a href="/" className="text-xs text-indigo-400 hover:text-indigo-300 hover:underline bg-black/50 px-2 py-1 rounded">
+                        ← Cambiar Rol
+                    </a>
+                </div>
+             )}
+             {/* @ts-ignore */}
+             <NonTeachingStaffDashboard 
+                courses={courses} 
+                userEmail={user.email || ''} 
+                profile={{
+                    id: user.id,
+                    email: user.email || '',
+                    first_name: profile?.first_name,
+                    last_name: profile?.last_name,
+                    dni: profile?.dni,
+                    birth_date: profile?.birth_date,
+                    phone: profile?.phone,
+                    roles: profile?.roles
+                }}
+             />
+          </div>
+      )
+  }
+  
+  if (effectiveRole === 'docente') {
+      const coursesResult = await getTeacherCourses()
+      const courses = coursesResult.success && coursesResult.data ? coursesResult.data : []
+      
+      return (
+          <div className="relative">
+             {hasMultipleRoles && (
+                <div className="absolute top-4 right-4 z-50">
+                    <a href="/" className="text-xs text-indigo-400 hover:text-indigo-300 hover:underline bg-black/50 px-2 py-1 rounded">
+                        ← Cambiar Rol
+                    </a>
+                </div>
+             )}
+             <TeacherDashboard 
+                courses={courses} 
+                userEmail={user.email || ''}
+                profile={{
+                    id: user.id,
+                    email: user.email || '',
+                    first_name: profile?.first_name,
+                    last_name: profile?.last_name,
+                    dni: profile?.dni,
+                    birth_date: profile?.birth_date,
+                    phone: profile?.phone,
+                    roles: profile?.roles
+                }}
+             />
+          </div>
+      )
+  }
+
+  if (effectiveRole === 'estudiante') {
+      const coursesResult = await getStudentCourses()
+      const courses = coursesResult.success && coursesResult.data ? coursesResult.data : []
+      
+      return (
+          <div className="relative">
+             {hasMultipleRoles && (
+                <div className="absolute top-4 right-4 z-50">
+                    <a href="/" className="text-xs text-indigo-400 hover:text-indigo-300 hover:underline bg-black/50 px-2 py-1 rounded">
+                        ← Cambiar Rol
+                    </a>
+                </div>
+             )}
+             <StudentDashboard 
+                courses={courses} 
+                userEmail={user.email || ''} 
+                profile={{
+                    id: user.id,
+                    email: user.email || '',
+                    first_name: profile?.first_name,
+                    last_name: profile?.last_name,
+                    dni: profile?.dni,
+                    birth_date: profile?.birth_date,
+                    phone: profile?.phone,
+                    roles: profile?.roles
+                }}
+             />
+          </div>
+      )
+  }
+  
+  // Fallback for roles that don't have a specific dashboard yet
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="flex min-h-screen flex-col items-center justify-center p-8 bg-black font-[family-name:var(--font-geist-sans)]">
+        <div className="bg-neutral-900 p-8 rounded-lg border border-neutral-800 text-center max-w-md">
+            <h1 className="text-2xl font-bold text-gray-100 mb-4">Bienvenido</h1>
+            <p className="text-gray-400 mb-6">
+                Has ingresado con el rol: <span className="text-indigo-400 font-semibold">{effectiveRole}</span>
+            </p>
+            <p className="text-gray-500 text-sm mb-6">
+                Aún no hay un panel específico configurado para este rol.
+            </p>
+            
+            <div className="flex flex-col gap-3">
+                {hasMultipleRoles && (
+                    <a href="/" className="text-indigo-400 hover:text-indigo-300 hover:underline">
+                        Cambiar de Rol
+                    </a>
+                )}
+                <form action="/auth/signout" method="post">
+                    <button className="text-gray-400 hover:text-gray-200 text-sm">
+                        Cerrar Sesión
+                    </button>
+                </form>
+            </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
     </div>
-  );
+  )
 }
