@@ -58,6 +58,62 @@ export async function getCourses(institutionId: string) {
     }
 }
 
+export async function updateStudentProfileByNodocente(
+    courseId: string, 
+    email: string, 
+    profileData: {
+        first_name: string
+        last_name: string
+        dni: string
+        phone: string
+        birth_date: string
+    }
+) {
+    try {
+        const { supabase } = await checkNodocenteCourseAccess(courseId)
+
+        const sanitizedBirthDate = profileData.birth_date === '' ? null : profileData.birth_date
+
+        // 1. Update Whitelist (Always update this as it's the source of truth for invites/enrollments)
+        const { error: whitelistError } = await supabase
+            .from('whitelist')
+            .update({
+                first_name: profileData.first_name,
+                last_name: profileData.last_name,
+                dni: profileData.dni,
+                phone: profileData.phone,
+                birth_date: sanitizedBirthDate
+            })
+            .eq('email', email)
+
+        if (whitelistError) {
+             console.error('Error updating whitelist:', whitelistError)
+        }
+
+        // 2. Update Profile (if user exists)
+        // Check if user exists in Auth first to get ID (needed for some RLS or just consistency)
+        // We use the admin client so we can just query profiles directly by email if we want, 
+        // but let's be safe and check auth.users first to mimic enrollment logic
+        const { data: { users }, error: authError } = await supabase.auth.admin.listUsers()
+        const existingAuthUser = users?.find(u => u.email === email)
+
+        if (existingAuthUser) {
+             await supabase.from('profiles').update({
+                 first_name: profileData.first_name,
+                 last_name: profileData.last_name,
+                 dni: profileData.dni,
+                 phone: profileData.phone,
+                 birth_date: sanitizedBirthDate
+             }).eq('id', existingAuthUser.id)
+        }
+        
+        revalidatePath(`/nodocente/courses/${courseId}`)
+        return { success: true }
+    } catch (error: unknown) {
+        return { success: false, error: (error as Error).message }
+    }
+}
+
 // Teacher specific actions
 async function checkTeacherCourseAccess(courseId: string) {
     const supabase = await createClient()
@@ -325,6 +381,24 @@ export async function updateCourseSettings(courseId: string, hasClasses: boolean
                 has_sprints: hasSprints,
                 has_teams: hasTeams
             })
+            .eq('id', courseId)
+
+        if (error) throw error
+        
+        revalidatePath(`/institution/[id]/courses/${courseId}`)
+        return { success: true }
+    } catch (error: unknown) {
+        return { success: false, error: (error as Error).message }
+    }
+}
+
+export async function updateCourseStatus(courseId: string, status: string) {
+    try {
+        const { supabase } = await checkInstitutionAdmin()
+        
+        const { error } = await supabase
+            .from('courses')
+            .update({ status })
             .eq('id', courseId)
 
         if (error) throw error
@@ -868,12 +942,222 @@ export async function getCourseStudentsForNodocente(courseId: string) {
     try {
         const { supabase } = await checkNodocenteCourseAccess(courseId)
         
-        const { data, error } = await supabase
+        // 1. Get enrollments
+        const { data: enrollments, error: enrollError } = await supabase
             .from('course_enrollments')
-            .select('*')
+            .select('email')
             .eq('course_id', courseId)
             .eq('role', 'estudiante')
             
+        if (enrollError) throw enrollError
+        
+        if (!enrollments || enrollments.length === 0) {
+            return { success: true, data: [] }
+        }
+
+        const emails = enrollments.map(e => e.email)
+
+        // 2. Get Profiles (for names, dni, phone)
+        const { data: profiles, error: profileError } = await supabase
+            .from('profiles')
+            .select('email, first_name, last_name, dni, phone, birth_date, avatar_url')
+            .in('email', emails)
+
+        if (profileError) throw profileError
+
+        // 3. Get Auth Users (for verification status based on last_sign_in_at)
+        // Note: Direct access to auth.users is restricted via PostgREST.
+        // We use admin.listUsers() as a workaround. It's not efficient for large datasets but works for small course sizes.
+        let authUsers: any[] = []
+        try {
+            const { data: { users }, error: authError } = await supabase.auth.admin.listUsers({
+                perPage: 1000 // Fetch reasonably large page to cover most course sizes
+            })
+            
+            if (authError) {
+                console.error('Error listing auth users:', authError)
+            } else {
+                // Filter in memory since listUsers doesn't support "in" filter
+                authUsers = users.filter(u => emails.includes(u.email || ''))
+            }
+        } catch (err) {
+            console.error('Exception fetching auth users:', err)
+        }
+
+        const profileMap = new Map(profiles?.map(p => [p.email, p]) || [])
+        // Map auth users by email for easy lookup
+        const authMap = new Map(authUsers.map(u => [u.email, u]))
+
+        // 4. Combine data
+        const students = emails.map(email => {
+            const profile = profileMap.get(email)
+            const authUser = authMap.get(email)
+            
+            // Verification logic: Verified if last_sign_in_at is present (not null)
+            const isVerified = !!authUser?.last_sign_in_at
+
+            return {
+                email,
+                first_name: profile?.first_name || '',
+                last_name: profile?.last_name || '',
+                dni: profile?.dni || '',
+                phone: profile?.phone || '',
+                birth_date: profile?.birth_date || null,
+                avatar_url: profile?.avatar_url || null,
+                is_verified: isVerified
+            }
+        }).sort((a, b) => {
+            const lastNameA = (a.last_name || '').toLowerCase()
+            const lastNameB = (b.last_name || '').toLowerCase()
+            if (lastNameA < lastNameB) return -1
+            if (lastNameA > lastNameB) return 1
+            
+            const firstNameA = (a.first_name || '').toLowerCase()
+            const firstNameB = (b.first_name || '').toLowerCase()
+            if (firstNameA < firstNameB) return -1
+            if (firstNameA > firstNameB) return 1
+            
+            return 0
+        })
+
+        return { success: true, data: students }
+    } catch (error: unknown) {
+        return { success: false, error: (error as Error).message }
+    }
+}
+
+export async function getCourseTeachersForNodocente(courseId: string) {
+    try {
+        const { supabase } = await checkNodocenteCourseAccess(courseId)
+        
+        // 1. Get enrollments
+        const { data: enrollments, error: enrollError } = await supabase
+            .from('course_enrollments')
+            .select('email')
+            .eq('course_id', courseId)
+            .eq('role', 'docente')
+            
+        if (enrollError) throw enrollError
+        
+        if (!enrollments || enrollments.length === 0) {
+            return { success: true, data: [] }
+        }
+
+        const emails = enrollments.map(e => e.email)
+
+        // 2. Get Profiles
+        const { data: profiles, error: profileError } = await supabase
+            .from('profiles')
+            .select('email, first_name, last_name, dni, phone, birth_date, avatar_url')
+            .in('email', emails)
+
+        if (profileError) throw profileError
+
+        const profileMap = new Map(profiles?.map(p => [p.email, p]) || [])
+
+        // 3. Combine data (No need for auth verification for simple list unless requested)
+        const teachers = emails.map(email => {
+            const profile = profileMap.get(email)
+            return {
+                email,
+                first_name: profile?.first_name || '',
+                last_name: profile?.last_name || '',
+                dni: profile?.dni || '',
+                phone: profile?.phone || '',
+                avatar_url: profile?.avatar_url || null,
+            }
+        }).sort((a, b) => {
+            const lastNameA = (a.last_name || '').toLowerCase()
+            const lastNameB = (b.last_name || '').toLowerCase()
+            if (lastNameA < lastNameB) return -1
+            if (lastNameA > lastNameB) return 1
+            
+            const firstNameA = (a.first_name || '').toLowerCase()
+            const firstNameB = (b.first_name || '').toLowerCase()
+            if (firstNameA < firstNameB) return -1
+            if (firstNameA > firstNameB) return 1
+            
+            return 0
+        })
+
+        return { success: true, data: teachers }
+    } catch (error: unknown) {
+        return { success: false, error: (error as Error).message }
+    }
+}
+
+export async function getCourseStaffForNodocente(courseId: string) {
+    try {
+        const { supabase } = await checkNodocenteCourseAccess(courseId)
+        
+        // 1. Get enrollments
+        const { data: enrollments, error: enrollError } = await supabase
+            .from('course_enrollments')
+            .select('email')
+            .eq('course_id', courseId)
+            .eq('role', 'nodocente')
+            
+        if (enrollError) throw enrollError
+        
+        if (!enrollments || enrollments.length === 0) {
+            return { success: true, data: [] }
+        }
+
+        const emails = enrollments.map(e => e.email)
+
+        // 2. Get Profiles
+        const { data: profiles, error: profileError } = await supabase
+            .from('profiles')
+            .select('email, first_name, last_name, dni, phone, birth_date, avatar_url')
+            .in('email', emails)
+
+        if (profileError) throw profileError
+
+        const profileMap = new Map(profiles?.map(p => [p.email, p]) || [])
+
+        // 3. Combine data
+        const staff = emails.map(email => {
+            const profile = profileMap.get(email)
+            return {
+                email,
+                first_name: profile?.first_name || '',
+                last_name: profile?.last_name || '',
+                dni: profile?.dni || '',
+                phone: profile?.phone || '',
+                avatar_url: profile?.avatar_url || null,
+            }
+        }).sort((a, b) => {
+            const lastNameA = (a.last_name || '').toLowerCase()
+            const lastNameB = (b.last_name || '').toLowerCase()
+            if (lastNameA < lastNameB) return -1
+            if (lastNameA > lastNameB) return 1
+            
+            const firstNameA = (a.first_name || '').toLowerCase()
+            const firstNameB = (b.first_name || '').toLowerCase()
+            if (firstNameA < firstNameB) return -1
+            if (firstNameA > firstNameB) return 1
+            
+            return 0
+        })
+
+        return { success: true, data: staff }
+    } catch (error: unknown) {
+        return { success: false, error: (error as Error).message }
+    }
+}
+
+export async function searchUsersForEnrollment(courseId: string, query: string) {
+    try {
+        const { supabase } = await checkNodocenteCourseAccess(courseId)
+        
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('id, email, first_name, last_name, dni, phone, birth_date, avatar_url')
+            .or(`email.ilike.%${query}%,first_name.ilike.%${query}%,last_name.ilike.%${query}%,dni.ilike.%${query}%`)
+            .order('last_name', { ascending: true })
+            .order('first_name', { ascending: true })
+            .limit(10)
+
         if (error) throw error
         return { success: true, data }
     } catch (error: unknown) {
@@ -881,73 +1165,138 @@ export async function getCourseStudentsForNodocente(courseId: string) {
     }
 }
 
-export async function enrollStudentByNodocente(courseId: string, email: string) {
+export async function enrollStudentByNodocente(courseId: string, email: string, profileData?: {
+    first_name: string
+    last_name: string
+    dni: string
+    phone: string
+    birth_date: string
+}) {
     try {
         const { supabase } = await checkNodocenteCourseAccess(courseId)
         
-        // 1. Check if user exists in the platform (using profiles as proxy)
-        const { data: profile } = await supabase
-            .from('profiles')
+        // Sanitize birth_date to handle empty strings from form
+        const sanitizedBirthDate = (profileData?.birth_date === '') ? null : profileData?.birth_date
+
+        // 1. Check if user exists in Auth (to correctly handle "Existing User" vs "New User")
+        // We trim and lowercase email for consistency
+        email = email.trim().toLowerCase()
+        
+        // Note: We use listUsers to find the user because direct schema access is restricted.
+        // This is not efficient for massive user bases but necessary without direct DB access to auth.users.
+        let existingAuthUser: any = null
+        try {
+            const { data: { users }, error: listError } = await supabase.auth.admin.listUsers({
+                perPage: 1000
+            })
+            if (listError) {
+                console.error('Error listing users for enrollment:', listError)
+            } else {
+                existingAuthUser = users.find(u => u.email?.toLowerCase() === email)
+            }
+        } catch (err) {
+            console.error('Exception listing users:', err)
+        }
+        
+        // 2. Prepare Whitelist Data
+        // Always ensure they are in whitelist with 'estudiante' role and latest profile data
+        let finalRoles = ['estudiante']
+        const whitelistData: any = { roles: finalRoles }
+        if (profileData) {
+            whitelistData.first_name = profileData.first_name
+            whitelistData.last_name = profileData.last_name
+            whitelistData.dni = profileData.dni
+            whitelistData.phone = profileData.phone
+            whitelistData.birth_date = sanitizedBirthDate
+        }
+
+        // 3. Upsert Whitelist
+        // We first check if whitelist entry exists to preserve other roles
+        const { data: whitelistUser } = await supabase
+            .from('whitelist')
             .select('roles')
             .eq('email', email)
             .single()
 
-        if (profile) {
-            // CASE 1 & 2: User exists in platform
-            const currentRoles = profile.roles || []
-            if (!currentRoles.includes('estudiante')) {
-                // CASE 2: Add 'estudiante' role
-                const newRoles = [...currentRoles, 'estudiante']
-                
-                // Update Profile
-                await supabase.from('profiles').update({ roles: newRoles }).eq('email', email)
-                
-                // Sync Whitelist
-                const { error: whitelistError } = await supabase
-                    .from('whitelist')
-                    .update({ roles: newRoles })
-                    .eq('email', email)
-
-                // If not in whitelist (edge case), insert
-                if (whitelistError) {
-                     await supabase.from('whitelist').insert({ email, roles: newRoles })
-                }
-            }
-            // CASE 1: Role exists, just enroll (logic below)
-        } else {
-            // CASE 3: User does not exist in platform
-            // "Regístralo en la plataforma, asígnale rol estudiante, y matricúlalo"
-            
-            // A. Update/Insert Whitelist first (Permissions)
-            const { data: whitelistUser } = await supabase
-                .from('whitelist')
-                .select('roles')
-                .eq('email', email)
-                .single()
-            
-            let finalRoles = ['estudiante']
-            if (whitelistUser) {
-                if (!whitelistUser.roles?.includes('estudiante')) {
-                    finalRoles = [...(whitelistUser.roles || []), 'estudiante']
-                    await supabase.from('whitelist').update({ roles: finalRoles }).eq('email', email)
-                } else {
-                    finalRoles = whitelistUser.roles
-                }
+        if (whitelistUser) {
+            if (!whitelistUser.roles?.includes('estudiante')) {
+                finalRoles = [...(whitelistUser.roles || []), 'estudiante']
+                whitelistData.roles = finalRoles
             } else {
-                await supabase.from('whitelist').insert({ email, roles: ['estudiante'] })
+                delete whitelistData.roles // Don't overwrite if already has it
+                finalRoles = whitelistUser.roles
             }
-
-            // B. Register User (Invite)
-            const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email)
-            
-            if (inviteError) {
-                console.error('Error inviting user:', inviteError)
-                // If user is already registered (but no profile?), ignore.
-                // Otherwise, we proceed with enrollment as they are whitelisted.
-            }
+            await supabase.from('whitelist').update(whitelistData).eq('email', email)
+        } else {
+            whitelistData.email = email
+            whitelistData.roles = ['estudiante']
+            await supabase.from('whitelist').insert(whitelistData)
         }
 
-        // 2. Enroll in Course
+        // 4. Update Profile if User Exists, or Create Auth User if New
+        if (existingAuthUser) {
+             // If they are in Auth, we should update their profile now
+             const profileUpdate: any = { roles: finalRoles }
+             if (profileData) {
+                 profileUpdate.first_name = profileData.first_name
+                 profileUpdate.last_name = profileData.last_name
+                 profileUpdate.dni = profileData.dni
+                 profileUpdate.phone = profileData.phone
+                 profileUpdate.birth_date = sanitizedBirthDate
+             }
+             
+             // Use upsert in case profile row is missing but auth row exists
+             await supabase.from('profiles').upsert({
+                 id: existingAuthUser.id,
+                 email: email,
+                 ...profileUpdate
+             })
+        } else {
+            // NEW USER: Create in Auth and Profile
+            // Create user in Supabase Auth (confirmed, no password - expects Google/MagicLink)
+            const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
+                email: email,
+                email_confirm: true, // Auto-confirm so they can login immediately with Google
+                user_metadata: {
+                    first_name: profileData?.first_name,
+                    last_name: profileData?.last_name,
+                    full_name: profileData ? `${profileData.first_name} ${profileData.last_name}` : undefined
+                }
+            })
+
+            if (createError) {
+                console.error('Error creating auth user:', createError)
+                throw new Error(`Error al crear usuario: ${createError.message}`)
+            }
+
+            if (newUser.user) {
+                // Create Profile for the new user
+                const newProfileData: any = {
+                    id: newUser.user.id,
+                    email: email,
+                    roles: finalRoles
+                }
+                
+                if (profileData) {
+                    newProfileData.first_name = profileData.first_name
+                    newProfileData.last_name = profileData.last_name
+                    newProfileData.dni = profileData.dni
+                    newProfileData.phone = profileData.phone
+                    newProfileData.birth_date = sanitizedBirthDate
+                }
+
+                const { error: profileError } = await supabase
+                    .from('profiles')
+                    .upsert(newProfileData)
+
+                if (profileError) {
+                    console.error('Error creating profile:', profileError)
+                    // Don't throw here to avoid blocking enrollment, but log it
+                }
+            }
+        }
+        
+        // 5. Enroll in Course
         const { error } = await supabase
             .from('course_enrollments')
             .insert({

@@ -1,24 +1,32 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createAssignment, deleteAssignment } from '@/app/actions/assignments'
 import SubmissionList from './SubmissionList'
 import AssignmentResourceList from './AssignmentResourceList'
+
+interface Sprint {
+    id: string
+    title: string
+}
 
 interface Assignment {
     id: string
     title: string
     description: string
     due_date: string
+    sprint_id?: string | null
 }
 
 interface AssignmentManagementProps {
     courseId: string
     initialAssignments: Assignment[]
+    sprints?: Sprint[]
 }
 
-export default function AssignmentManagement({ courseId, initialAssignments }: AssignmentManagementProps) {
+export default function AssignmentManagement({ courseId, initialAssignments, sprints = [] }: AssignmentManagementProps) {
     const [assignments, setAssignments] = useState<Assignment[]>(initialAssignments)
+    const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null)
     const [isAdding, setIsAdding] = useState(false)
     const [loading, setLoading] = useState(false)
     const [expandedAssignmentId, setExpandedAssignmentId] = useState<string | null>(null)
@@ -28,6 +36,19 @@ export default function AssignmentManagement({ courseId, initialAssignments }: A
     const [title, setTitle] = useState('')
     const [description, setDescription] = useState('')
     const [dueDate, setDueDate] = useState('')
+    const [formSprintId, setFormSprintId] = useState<string>('')
+
+    useEffect(() => {
+        if (isAdding && selectedSprintId) {
+            setFormSprintId(selectedSprintId)
+        } else if (isAdding && !selectedSprintId) {
+            setFormSprintId('')
+        }
+    }, [isAdding, selectedSprintId])
+
+    const filteredAssignments = selectedSprintId 
+        ? assignments.filter(a => a.sprint_id === selectedSprintId)
+        : assignments.filter(a => !a.sprint_id)
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
@@ -37,12 +58,13 @@ export default function AssignmentManagement({ courseId, initialAssignments }: A
             const dateObj = new Date(dueDate)
             const isoDate = dateObj.toISOString()
 
-            const result = await createAssignment(courseId, title, description, isoDate)
+            const result = await createAssignment(courseId, title, description, isoDate, formSprintId || null)
             
             if (result.success) {
                 setTitle('')
                 setDescription('')
                 setDueDate('')
+                setFormSprintId('')
                 setIsAdding(false)
                 window.location.reload()
             } else {
@@ -82,6 +104,35 @@ export default function AssignmentManagement({ courseId, initialAssignments }: A
                 </button>
             </div>
 
+            {/* Sprint Tabs */}
+            {sprints.length > 0 && (
+                <div className="flex gap-2 overflow-x-auto pb-4 border-b border-neutral-800 scrollbar-thin scrollbar-thumb-neutral-700">
+                    <button
+                        onClick={() => setSelectedSprintId(null)}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                            selectedSprintId === null
+                                ? 'bg-indigo-600 text-white'
+                                : 'bg-neutral-900 text-gray-400 hover:text-gray-200 hover:bg-neutral-800'
+                        }`}
+                    >
+                        General
+                    </button>
+                    {sprints.map(sprint => (
+                        <button
+                            key={sprint.id}
+                            onClick={() => setSelectedSprintId(sprint.id)}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                                selectedSprintId === sprint.id
+                                    ? 'bg-indigo-600 text-white'
+                                    : 'bg-neutral-900 text-gray-400 hover:text-gray-200 hover:bg-neutral-800'
+                            }`}
+                        >
+                            {sprint.title}
+                        </button>
+                    ))}
+                </div>
+            )}
+
             {isAdding && (
                 <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
                     <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-lg w-full max-w-md">
@@ -105,6 +156,23 @@ export default function AssignmentManagement({ courseId, initialAssignments }: A
                                     className="w-full bg-black border border-neutral-700 rounded p-2 text-gray-100 focus:border-indigo-500 focus:outline-none h-32 resize-none"
                                 />
                             </div>
+                            {sprints.length > 0 && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-400 mb-1">Sprint (Opcional)</label>
+                                    <select
+                                        value={formSprintId}
+                                        onChange={(e) => setFormSprintId(e.target.value)}
+                                        className="w-full bg-black border border-neutral-700 rounded p-2 text-gray-100 focus:border-indigo-500 focus:outline-none"
+                                    >
+                                        <option value="">General (Sin Sprint)</option>
+                                        {sprints.map(sprint => (
+                                            <option key={sprint.id} value={sprint.id}>
+                                                {sprint.title}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
                             <div>
                                 <label className="block text-sm font-medium text-gray-400 mb-1">Fecha de Entrega</label>
                                 <input 
@@ -138,12 +206,14 @@ export default function AssignmentManagement({ courseId, initialAssignments }: A
             )}
 
             <div className="grid gap-4">
-                {assignments.length === 0 ? (
+                {filteredAssignments.length === 0 ? (
                     <div className="text-center py-12 text-gray-500 bg-neutral-900/50 rounded-lg border border-neutral-800/50">
-                        No hay trabajos prácticos creados.
+                        {selectedSprintId 
+                            ? 'No hay trabajos prácticos en este sprint.' 
+                            : 'No hay trabajos prácticos generales.'}
                     </div>
                 ) : (
-                    assignments.map((item) => (
+                    filteredAssignments.map((item) => (
                         <div 
                             key={item.id} 
                             className="bg-neutral-900 border border-neutral-800 p-4 rounded-lg hover:border-neutral-700 transition-colors flex flex-col group"

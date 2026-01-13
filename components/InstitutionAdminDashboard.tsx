@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import ProfileManager from '@/components/ProfileManager'
 
 type Institution = {
@@ -11,11 +12,13 @@ type Institution = {
 export default function InstitutionAdminDashboard({ 
     institutions, 
     userEmail,
-    profile
+    profile,
+    hasMultipleRoles = false
 }: { 
     institutions: Institution[], 
     userEmail: string 
     profile?: any
+    hasMultipleRoles?: boolean
 }) {
   return (
     <div className="flex min-h-screen flex-col items-center p-8 font-[family-name:var(--font-geist-sans)] bg-black">
@@ -28,15 +31,7 @@ export default function InstitutionAdminDashboard({
                 </p>
              </div>
              <div className="flex gap-4 items-center">
-                 {profile && <ProfileManager initialProfile={profile} />}
-                 <form action="/auth/signout" method="post">
-                    <button 
-                        className="bg-neutral-800 text-gray-200 border border-neutral-700 px-4 py-2 rounded-md hover:bg-neutral-700 transition-colors text-sm font-medium"
-                        type="submit"
-                    >
-                        Cerrar Sesión
-                    </button>
-                 </form>
+                 {profile && <ProfileManager initialProfile={profile} hasMultipleRoles={hasMultipleRoles} />}
              </div>
         </div>
         
@@ -50,21 +45,15 @@ export default function InstitutionAdminDashboard({
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {institutions.map(inst => (
-                        <div key={inst.id} className="bg-neutral-800 p-5 rounded border border-neutral-700 hover:border-indigo-500 transition-colors group">
-                            <h3 className="text-xl font-semibold text-gray-200 group-hover:text-white transition-colors">{inst.nombre}</h3>
-                            <p className="text-xs text-gray-500 mt-2 font-mono">ID: {inst.id}</p>
-                            <div className="mt-4 pt-4 border-t border-neutral-700 flex gap-2">
-                                <a 
-                                    href={`/institution/${inst.id}/courses`}
-                                    className="text-xs bg-indigo-900/50 text-indigo-300 px-3 py-1.5 rounded border border-indigo-800 hover:bg-indigo-900 transition-colors text-center"
-                                >
-                                    Gestionar Cursos
-                                </a>
-                                <button className="text-xs bg-neutral-700 text-gray-300 px-3 py-1.5 rounded border border-neutral-600 hover:bg-neutral-600 transition-colors">
-                                    Reportes
-                                </button>
+                        <Link 
+                            key={inst.id} 
+                            href={`/institution/${inst.id}/courses`}
+                            className="block"
+                        >
+                            <div className="bg-neutral-800 p-5 rounded border border-neutral-700 hover:border-indigo-500 transition-colors group h-full flex flex-col justify-center min-h-[120px]">
+                                <h3 className="text-xl font-semibold text-gray-200 group-hover:text-white transition-colors">{inst.nombre}</h3>
                             </div>
-                        </div>
+                        </Link>
                     ))}
                 </div>
             )}

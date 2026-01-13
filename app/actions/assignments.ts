@@ -94,17 +94,32 @@ export async function getStudentAssignments(courseId: string) {
     }
 }
 
-export async function createAssignment(courseId: string, title: string, description: string, dueDate: string) {
+export async function createAssignment(courseId: string, title: string, description: string, dueDate: string, sprintId: string | null = null) {
     try {
-        const { supabase } = await checkAuth()
+        const { user } = await checkAuth()
+        const adminClient = getAdminClient()
 
-        const { error } = await supabase
+        // Verify teacher enrollment
+        const { data: teacherEnrollment } = await adminClient
+            .from('course_enrollments')
+            .select('id')
+            .eq('course_id', courseId)
+            .ilike('email', user.email!)
+            .eq('role', 'docente')
+            .single()
+
+        if (!teacherEnrollment) {
+            throw new Error('No tienes permisos de docente en este curso')
+        }
+
+        const { error } = await adminClient
             .from('assignments')
             .insert({
                 course_id: courseId,
                 title,
                 description,
-                due_date: dueDate
+                due_date: dueDate,
+                sprint_id: sprintId || null
             })
 
         if (error) throw error
@@ -118,12 +133,27 @@ export async function createAssignment(courseId: string, title: string, descript
 
 export async function deleteAssignment(assignmentId: string, courseId: string) {
     try {
-        const { supabase } = await checkAuth()
+        const { user } = await checkAuth()
+        const adminClient = getAdminClient()
 
-        const { error } = await supabase
+        // Verify teacher enrollment
+        const { data: teacherEnrollment } = await adminClient
+            .from('course_enrollments')
+            .select('id')
+            .eq('course_id', courseId)
+            .ilike('email', user.email!)
+            .eq('role', 'docente')
+            .single()
+
+        if (!teacherEnrollment) {
+            throw new Error('No tienes permisos de docente en este curso')
+        }
+
+        const { error } = await adminClient
             .from('assignments')
             .delete()
             .eq('id', assignmentId)
+            .eq('course_id', courseId)
 
         if (error) throw error
         
@@ -153,9 +183,40 @@ export async function getAssignmentSubmissions(assignmentId: string) {
 
 export async function updateSubmissionGrade(submissionId: string, grade: string) {
     try {
-        const { supabase } = await checkAuth()
+        const { user } = await checkAuth()
+        const adminClient = getAdminClient()
 
-        const { error } = await supabase
+        // Get submission info to verify permissions
+        const { data: submission } = await adminClient
+            .from('assignment_submissions')
+            .select('assignment_id')
+            .eq('id', submissionId)
+            .single()
+            
+        if (!submission) throw new Error('Entrega no encontrada')
+
+        const { data: assignment } = await adminClient
+            .from('assignments')
+            .select('course_id')
+            .eq('id', submission.assignment_id)
+            .single()
+            
+        if (!assignment) throw new Error('Trabajo práctico no encontrado')
+
+        // Verify teacher enrollment
+        const { data: teacherEnrollment } = await adminClient
+            .from('course_enrollments')
+            .select('id')
+            .eq('course_id', assignment.course_id)
+            .ilike('email', user.email!)
+            .eq('role', 'docente')
+            .single()
+
+        if (!teacherEnrollment) {
+            throw new Error('No tienes permisos de docente en este curso')
+        }
+
+        const { error } = await adminClient
             .from('assignment_submissions')
             .update({ grade })
             .eq('id', submissionId)
@@ -250,9 +311,32 @@ export async function getAssignmentResources(assignmentId: string) {
 
 export async function createAssignmentResource(assignmentId: string, title: string, url: string, type: string) {
     try {
-        const { supabase } = await checkAuth()
+        const { user } = await checkAuth()
+        const adminClient = getAdminClient()
 
-        const { error } = await supabase
+        // Get course_id from assignment
+        const { data: assignment } = await adminClient
+            .from('assignments')
+            .select('course_id')
+            .eq('id', assignmentId)
+            .single()
+        
+        if (!assignment) throw new Error('Trabajo práctico no encontrado')
+
+        // Verify teacher enrollment
+        const { data: teacherEnrollment } = await adminClient
+            .from('course_enrollments')
+            .select('id')
+            .eq('course_id', assignment.course_id)
+            .ilike('email', user.email!)
+            .eq('role', 'docente')
+            .single()
+
+        if (!teacherEnrollment) {
+            throw new Error('No tienes permisos de docente en este curso')
+        }
+
+        const { error } = await adminClient
             .from('assignment_resources')
             .insert({
                 assignment_id: assignmentId,
@@ -270,9 +354,41 @@ export async function createAssignmentResource(assignmentId: string, title: stri
 
 export async function deleteAssignmentResource(resourceId: string) {
     try {
-        const { supabase } = await checkAuth()
+        const { user } = await checkAuth()
+        const adminClient = getAdminClient()
 
-        const { error } = await supabase
+        // Get assignment and course info through resource
+        // Note: performing two queries to avoid complex join typing issues if not strictly necessary
+        const { data: resource } = await adminClient
+            .from('assignment_resources')
+            .select('assignment_id')
+            .eq('id', resourceId)
+            .single()
+
+        if (!resource) throw new Error('Recurso no encontrado')
+
+        const { data: assignment } = await adminClient
+            .from('assignments')
+            .select('course_id')
+            .eq('id', resource.assignment_id)
+            .single()
+
+        if (!assignment) throw new Error('Trabajo práctico no encontrado')
+        
+        // Check permissions
+        const { data: teacherEnrollment } = await adminClient
+            .from('course_enrollments')
+            .select('id')
+            .eq('course_id', assignment.course_id)
+            .ilike('email', user.email!)
+            .eq('role', 'docente')
+            .single()
+
+        if (!teacherEnrollment) {
+            throw new Error('No tienes permisos de docente en este curso')
+        }
+
+        const { error } = await adminClient
             .from('assignment_resources')
             .delete()
             .eq('id', resourceId)

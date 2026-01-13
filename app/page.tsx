@@ -27,7 +27,7 @@ export default async function Home(props: {
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('roles, first_name, last_name, dni, birth_date, phone')
+    .select('roles, first_name, last_name, dni, birth_date, phone, avatar_url')
     .eq('id', user.id)
     .single()
   
@@ -70,29 +70,20 @@ export default async function Home(props: {
                     </p>
                  </div>
                  <div className="flex gap-4 items-center">
-                    <ProfileManager initialProfile={{
-                        id: user.id,
-                        email: user.email || '',
-                        first_name: profile?.first_name,
-                        last_name: profile?.last_name,
-                        dni: profile?.dni,
-                        birth_date: profile?.birth_date,
-                        phone: profile?.phone,
-                        roles: profile?.roles
-                    }} />
-                    {hasMultipleRoles && (
-                        <a href="/" className="text-sm text-indigo-400 hover:text-indigo-300 hover:underline">
-                            Cambiar Rol
-                        </a>
-                    )}
-                    <form action="/auth/signout" method="post">
-                        <button 
-                            className="bg-neutral-800 text-gray-200 border border-neutral-700 px-4 py-2 rounded-md hover:bg-neutral-700 transition-colors text-sm font-medium"
-                            type="submit"
-                        >
-                            Cerrar Sesión
-                        </button>
-                    </form>
+                    <ProfileManager 
+                        initialProfile={{
+                            id: user.id,
+                            email: user.email || '',
+                            first_name: profile?.first_name,
+                            last_name: profile?.last_name,
+                            dni: profile?.dni,
+                            birth_date: profile?.birth_date,
+                            phone: profile?.phone,
+                            roles: profile?.roles,
+                            avatar_url: profile?.avatar_url
+                        }} 
+                        hasMultipleRoles={hasMultipleRoles}
+                    />
                  </div>
             </div>
             
@@ -141,14 +132,6 @@ export default async function Home(props: {
       const institutions = institutionsResult.success && institutionsResult.data ? institutionsResult.data : []
       
       return (
-          <div className="relative">
-             {hasMultipleRoles && (
-                <div className="absolute top-4 right-4 z-50">
-                    <a href="/" className="text-xs text-indigo-400 hover:text-indigo-300 hover:underline bg-black/50 px-2 py-1 rounded">
-                        ← Cambiar Rol
-                    </a>
-                </div>
-             )}
              <InstitutionAdminDashboard 
                 institutions={institutions}
                 userEmail={user.email || ''}
@@ -160,10 +143,11 @@ export default async function Home(props: {
                     dni: profile?.dni,
                     birth_date: profile?.birth_date,
                     phone: profile?.phone,
-                    roles: profile?.roles
+                    roles: profile?.roles,
+                    avatar_url: profile?.avatar_url
                 }}
+                hasMultipleRoles={hasMultipleRoles}
              />
-          </div>
       )
   }
 
@@ -172,15 +156,7 @@ export default async function Home(props: {
       const courses = coursesResult.success && coursesResult.data ? coursesResult.data : []
 
       return (
-          <div className="relative">
-             {hasMultipleRoles && (
-                <div className="absolute top-4 right-4 z-50">
-                    <a href="/" className="text-xs text-indigo-400 hover:text-indigo-300 hover:underline bg-black/50 px-2 py-1 rounded">
-                        ← Cambiar Rol
-                    </a>
-                </div>
-             )}
-             {/* @ts-ignore */}
+             /* @ts-ignore */
              <NonTeachingStaffDashboard 
                 courses={courses} 
                 userEmail={user.email || ''} 
@@ -192,10 +168,11 @@ export default async function Home(props: {
                     dni: profile?.dni,
                     birth_date: profile?.birth_date,
                     phone: profile?.phone,
-                    roles: profile?.roles
+                    roles: profile?.roles,
+                    avatar_url: profile?.avatar_url
                 }}
+                hasMultipleRoles={hasMultipleRoles}
              />
-          </div>
       )
   }
   
@@ -204,14 +181,6 @@ export default async function Home(props: {
       const courses = coursesResult.success && coursesResult.data ? coursesResult.data : []
       
       return (
-          <div className="relative">
-             {hasMultipleRoles && (
-                <div className="absolute top-4 right-4 z-50">
-                    <a href="/" className="text-xs text-indigo-400 hover:text-indigo-300 hover:underline bg-black/50 px-2 py-1 rounded">
-                        ← Cambiar Rol
-                    </a>
-                </div>
-             )}
              <TeacherDashboard 
                 courses={courses} 
                 userEmail={user.email || ''}
@@ -223,10 +192,11 @@ export default async function Home(props: {
                     dni: profile?.dni,
                     birth_date: profile?.birth_date,
                     phone: profile?.phone,
-                    roles: profile?.roles
+                    roles: profile?.roles,
+                    avatar_url: profile?.avatar_url
                 }}
+                hasMultipleRoles={hasMultipleRoles}
              />
-          </div>
       )
   }
 
@@ -235,14 +205,6 @@ export default async function Home(props: {
       const courses = coursesResult.success && coursesResult.data ? coursesResult.data : []
       
       return (
-          <div className="relative">
-             {hasMultipleRoles && (
-                <div className="absolute top-4 right-4 z-50">
-                    <a href="/" className="text-xs text-indigo-400 hover:text-indigo-300 hover:underline bg-black/50 px-2 py-1 rounded">
-                        ← Cambiar Rol
-                    </a>
-                </div>
-             )}
              <StudentDashboard 
                 courses={courses} 
                 userEmail={user.email || ''} 
@@ -254,10 +216,11 @@ export default async function Home(props: {
                     dni: profile?.dni,
                     birth_date: profile?.birth_date,
                     phone: profile?.phone,
-                    roles: profile?.roles
+                    roles: profile?.roles,
+                    avatar_url: profile?.avatar_url
                 }}
+                hasMultipleRoles={hasMultipleRoles}
              />
-          </div>
       )
   }
   

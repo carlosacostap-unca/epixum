@@ -14,11 +14,13 @@ interface Course {
 export default function NonTeachingStaffDashboard({ 
     userEmail,
     courses = [],
-    profile
+    profile,
+    hasMultipleRoles = false
 }: { 
     userEmail: string 
     courses?: Course[]
     profile?: any
+    hasMultipleRoles?: boolean
 }) {
   
   // Group courses by institution
@@ -42,15 +44,7 @@ export default function NonTeachingStaffDashboard({
                 </p>
              </div>
              <div className="flex gap-4 items-center">
-                 {profile && <ProfileManager initialProfile={profile} />}
-                 <form action="/auth/signout" method="post">
-                    <button 
-                        className="bg-neutral-800 text-gray-200 border border-neutral-700 px-4 py-2 rounded-md hover:bg-neutral-700 transition-colors text-sm font-medium"
-                        type="submit"
-                    >
-                        Cerrar Sesión
-                    </button>
-                 </form>
+                 {profile && <ProfileManager initialProfile={profile} hasMultipleRoles={hasMultipleRoles} />}
              </div>
         </div>
         

@@ -212,6 +212,7 @@ export async function getStudentCourseDetails(courseId: string) {
                 id, 
                 name, 
                 description, 
+                status,
                 institution_id,
                 has_classes,
                 has_sprints,
@@ -222,6 +223,10 @@ export async function getStudentCourseDetails(courseId: string) {
             .single()
 
         if (error) throw error
+
+        if (data.status === 'Borrador') {
+            throw new Error('Este curso aún no está disponible')
+        }
         
         const course = {
             id: data.id,

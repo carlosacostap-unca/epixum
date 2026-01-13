@@ -148,6 +148,7 @@ export default function TeacherCourseView({
                 <AssignmentManagement 
                     courseId={courseId}
                     initialAssignments={initialAssignments}
+                    sprints={initialSprints}
                 />
             )}
             

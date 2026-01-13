@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import ProfileManager from '@/components/ProfileManager'
 
 interface Course {
@@ -7,15 +8,17 @@ interface Course {
     name: string
     description: string
     institution_name: string
+    status?: string
 }
 
 interface StudentDashboardProps {
     courses: Course[]
     userEmail: string
     profile?: any
+    hasMultipleRoles?: boolean
 }
 
-export default function StudentDashboard({ courses, userEmail, profile }: StudentDashboardProps) {
+export default function StudentDashboard({ courses, userEmail, profile, hasMultipleRoles = false }: StudentDashboardProps) {
     return (
         <div className="flex min-h-screen flex-col items-center p-8 bg-black font-[family-name:var(--font-geist-sans)]">
             <main className="w-full max-w-4xl flex flex-col gap-8 items-start">
@@ -29,15 +32,7 @@ export default function StudentDashboard({ courses, userEmail, profile }: Studen
                         </p>
                     </div>
                     <div className="flex gap-4 items-center">
-                        {profile && <ProfileManager initialProfile={profile} />}
-                        <form action="/auth/signout" method="post">
-                            <button 
-                                className="bg-neutral-800 text-gray-200 border border-neutral-700 px-4 py-2 rounded-md hover:bg-neutral-700 transition-colors text-sm font-medium"
-                                type="submit"
-                            >
-                                Cerrar Sesión
-                            </button>
-                        </form>
+                        {profile && <ProfileManager initialProfile={profile} hasMultipleRoles={hasMultipleRoles} />}
                     </div>
                 </div>
 
@@ -51,26 +46,36 @@ export default function StudentDashboard({ courses, userEmail, profile }: Studen
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {courses.map(course => (
-                                <div key={course.id} className="bg-neutral-900 border border-neutral-800 rounded-lg p-6 hover:bg-neutral-800 transition-all group">
-                                    <div className="flex justify-between items-start mb-4">
+                                <Link href={`/student/courses/${course.id}`} key={course.id} className="block group">
+                                    <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6 hover:bg-neutral-800 transition-all h-full flex flex-col justify-between">
                                         <div>
-                                            <span className="text-xs font-medium text-indigo-400 bg-indigo-900/30 px-2 py-1 rounded">
-                                                {course.institution_name || 'Institución'}
-                                            </span>
-                                            <h3 className="text-xl font-bold text-gray-100 mt-2 group-hover:text-indigo-400 transition-colors">
-                                                {course.name}
-                                            </h3>
+                                            <div className="flex justify-between items-start mb-4">
+                                                <div>
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <span className="text-xs font-medium text-indigo-400 bg-indigo-900/30 px-2 py-1 rounded">
+                                                            {course.institution_name || 'Institución'}
+                                                        </span>
+                                                        {course.status && (
+                                                            <span className={`text-[10px] px-2 py-0.5 rounded border uppercase font-bold tracking-wider ${
+                                                                course.status === 'Activo' ? 'bg-green-900/30 text-green-400 border-green-800' :
+                                                                course.status === 'Finalizado' ? 'bg-blue-900/30 text-blue-400 border-blue-800' :
+                                                                'bg-gray-800 text-gray-400 border-gray-700'
+                                                            }`}>
+                                                                {course.status}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <h3 className="text-xl font-bold text-gray-100 mt-2 group-hover:text-indigo-400 transition-colors">
+                                                        {course.name}
+                                                    </h3>
+                                                </div>
+                                            </div>
+                                            <p className="text-gray-400 text-sm mb-6 line-clamp-2">
+                                                {course.description || 'Sin descripción'}
+                                            </p>
                                         </div>
                                     </div>
-                                    <p className="text-gray-400 text-sm mb-6 line-clamp-2">
-                                        {course.description || 'Sin descripción'}
-                                    </p>
-                                    <div className="border-t border-neutral-800 pt-4 flex justify-end">
-                                        <a href={`/student/courses/${course.id}`} className="text-sm font-medium text-gray-300 hover:text-white transition-colors">
-                                            Ver Curso →
-                                        </a>
-                                    </div>
-                                </div>
+                                </Link>
                             ))}
                         </div>
                     )}

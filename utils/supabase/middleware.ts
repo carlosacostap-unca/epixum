@@ -36,25 +36,61 @@ export async function updateSession(request: NextRequest) {
 
   // IMPORTANT: DO NOT REMOVE auth.getUser()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  let user = null
+  try {
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser()
+    user = authUser
+  } catch (err) {
+    console.error('Middleware auth error:', err)
+    // Treat as unauthenticated
+  }
 
-  if (
-    !user &&
-    !request.nextUrl.pathname.startsWith('/login') &&
-    !request.nextUrl.pathname.startsWith('/auth') &&
-    !request.nextUrl.pathname.startsWith('/unauthorized')
-  ) {
+  const isPublicPath = 
+    request.nextUrl.pathname.startsWith('/login') ||
+    request.nextUrl.pathname.startsWith('/auth') ||
+    request.nextUrl.pathname.startsWith('/unauthorized')
+
+  if (!user && !isPublicPath) {
     // no user, potentially respond by redirecting the user to the login page
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  // If user is logged in, we might want to check roles here, but for now
-  // we will handle basic session refresh.
-  // The specific role check can also happen here or in the specific pages.
+  // Profile completion check
+  if (user && !request.nextUrl.pathname.startsWith('/auth')) {
+    const isCompleteProfilePage = request.nextUrl.pathname === '/complete-profile'
+    
+    // Fetch profile data
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('first_name, last_name, dni, birth_date, phone')
+      .eq('id', user.id)
+      .single()
+
+    const isProfileComplete = profile && 
+      profile.first_name && 
+      profile.last_name && 
+      profile.dni && 
+      profile.birth_date && 
+      profile.phone
+
+    if (!isProfileComplete && !isCompleteProfilePage) {
+      // If profile is incomplete and user is not on completion page, redirect
+      const url = request.nextUrl.clone()
+      url.pathname = '/complete-profile'
+      return NextResponse.redirect(url)
+    }
+
+    if (isProfileComplete && isCompleteProfilePage) {
+      // If profile is already complete and user tries to access completion page, redirect to home
+      const url = request.nextUrl.clone()
+      url.pathname = '/'
+      return NextResponse.redirect(url)
+    }
+  }
 
   return supabaseResponse
 }
