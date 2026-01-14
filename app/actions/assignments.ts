@@ -65,20 +65,31 @@ export async function getAssignments(courseId: string) {
 
 export async function getStudentAssignments(courseId: string) {
     try {
-        const { user } = await checkAuth()
+        const { user, supabase } = await checkAuth()
         const adminClient = getAdminClient()
 
-        // Verify enrollment (check for both 'estudiante' and 'alumno' to support migration states)
-        const { data: enrollment, error: enrollmentError } = await adminClient
-            .from('course_enrollments')
-            .select('id')
-            .eq('course_id', courseId)
-            .ilike('email', user.email!)
-            .in('role', ['estudiante', 'alumno', 'Estudiante', 'Alumno'])
+        // Check if supervisor
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('roles')
+            .eq('email', user.email!)
             .single()
+        
+        const isSupervisor = profile?.roles?.includes('supervisor')
 
-        if (enrollmentError || !enrollment) {
-            throw new Error('No estás matriculado en este curso')
+        if (!isSupervisor) {
+            // Verify enrollment (check for both 'estudiante' and 'alumno' to support migration states)
+            const { data: enrollment, error: enrollmentError } = await adminClient
+                .from('course_enrollments')
+                .select('id')
+                .eq('course_id', courseId)
+                .ilike('email', user.email!)
+                .in('role', ['estudiante', 'alumno', 'Estudiante', 'Alumno'])
+                .single()
+
+            if (enrollmentError || !enrollment) {
+                throw new Error('No estás matriculado en este curso')
+            }
         }
 
         const { data, error } = await adminClient
@@ -125,6 +136,52 @@ export async function createAssignment(courseId: string, title: string, descript
         if (error) throw error
         
         revalidatePath(`/teacher/courses/${courseId}`)
+        return { success: true }
+    } catch (error: unknown) {
+        return { success: false, error: (error as Error).message }
+    }
+}
+
+export async function updateAssignment(assignmentId: string, title: string, description: string, dueDate: string, sprintId: string | null = null) {
+    try {
+        const { user } = await checkAuth()
+        const adminClient = getAdminClient()
+
+        // Get course_id from assignment
+        const { data: assignment } = await adminClient
+            .from('assignments')
+            .select('course_id')
+            .eq('id', assignmentId)
+            .single()
+
+        if (!assignment) throw new Error('Trabajo práctico no encontrado')
+
+        // Verify teacher enrollment
+        const { data: teacherEnrollment } = await adminClient
+            .from('course_enrollments')
+            .select('id')
+            .eq('course_id', assignment.course_id)
+            .ilike('email', user.email!)
+            .eq('role', 'docente')
+            .single()
+
+        if (!teacherEnrollment) {
+            throw new Error('No tienes permisos de docente en este curso')
+        }
+
+        const { error } = await adminClient
+            .from('assignments')
+            .update({
+                title,
+                description,
+                due_date: dueDate,
+                sprint_id: sprintId || null
+            })
+            .eq('id', assignmentId)
+
+        if (error) throw error
+        
+        revalidatePath(`/teacher/courses/${assignment.course_id}`)
         return { success: true }
     } catch (error: unknown) {
         return { success: false, error: (error as Error).message }
@@ -352,6 +409,57 @@ export async function createAssignmentResource(assignmentId: string, title: stri
     }
 }
 
+export async function updateAssignmentResource(resourceId: string, title: string, url: string, type: string) {
+    try {
+        const { user } = await checkAuth()
+        const adminClient = getAdminClient()
+
+        // Get assignment and course info through resource
+        const { data: resource } = await adminClient
+            .from('assignment_resources')
+            .select('assignment_id')
+            .eq('id', resourceId)
+            .single()
+
+        if (!resource) throw new Error('Recurso no encontrado')
+
+        const { data: assignment } = await adminClient
+            .from('assignments')
+            .select('course_id')
+            .eq('id', resource.assignment_id)
+            .single()
+
+        if (!assignment) throw new Error('Trabajo práctico no encontrado')
+
+        // Verify teacher enrollment
+        const { data: teacherEnrollment } = await adminClient
+            .from('course_enrollments')
+            .select('id')
+            .eq('course_id', assignment.course_id)
+            .ilike('email', user.email!)
+            .eq('role', 'docente')
+            .single()
+
+        if (!teacherEnrollment) {
+            throw new Error('No tienes permisos de docente en este curso')
+        }
+
+        const { error } = await adminClient
+            .from('assignment_resources')
+            .update({
+                title,
+                url,
+                type
+            })
+            .eq('id', resourceId)
+
+        if (error) throw error
+        return { success: true }
+    } catch (error: unknown) {
+        return { success: false, error: (error as Error).message }
+    }
+}
+
 export async function deleteAssignmentResource(resourceId: string) {
     try {
         const { user } = await checkAuth()
@@ -361,7 +469,7 @@ export async function deleteAssignmentResource(resourceId: string) {
         // Note: performing two queries to avoid complex join typing issues if not strictly necessary
         const { data: resource } = await adminClient
             .from('assignment_resources')
-            .select('assignment_id')
+            .select('assignment_id, url, type')
             .eq('id', resourceId)
             .single()
 
@@ -386,6 +494,27 @@ export async function deleteAssignmentResource(resourceId: string) {
 
         if (!teacherEnrollment) {
             throw new Error('No tienes permisos de docente en este curso')
+        }
+
+        // Delete file from storage if applicable
+        if (resource.type === 'doc' && resource.url.includes('/class-resources/')) {
+            try {
+                // Extract path from URL (after /class-resources/)
+                const pathParts = resource.url.split('/class-resources/')
+                if (pathParts.length > 1) {
+                    const filePath = decodeURIComponent(pathParts[1])
+                    const { error: storageError } = await adminClient
+                        .storage
+                        .from('class-resources')
+                        .remove([filePath])
+                    
+                    if (storageError) {
+                        console.error('Error deleting file from storage:', storageError)
+                    }
+                }
+            } catch (e) {
+                console.error('Error processing storage deletion:', e)
+            }
         }
 
         const { error } = await adminClient

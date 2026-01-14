@@ -4,6 +4,8 @@ import { useState } from 'react'
 
 interface StudentStats {
     email: string
+    first_name?: string
+    last_name?: string
     joined_at: string
     totalAssignments: number
     submitted: number
@@ -58,15 +60,22 @@ export default function TeacherStudentManagement({
                                         ? Math.round((student.approved / student.totalAssignments) * 100)
                                         : 0
 
+                                    const displayName = student.last_name && student.first_name
+                                        ? `${student.last_name}, ${student.first_name}`
+                                        : (student.last_name || student.first_name || student.email)
+
                                     return (
                                         <tr key={student.email} className="hover:bg-neutral-800/30 transition-colors">
                                             <td className="p-4">
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-8 h-8 rounded-full bg-indigo-900/30 flex items-center justify-center text-indigo-400 font-bold text-xs">
-                                                        {student.email.charAt(0).toUpperCase()}
+                                                        {displayName.charAt(0).toUpperCase()}
                                                     </div>
                                                     <div>
-                                                        <p className="text-gray-200 font-medium">{student.email}</p>
+                                                        <p className="text-gray-200 font-medium">{displayName}</p>
+                                                        {displayName !== student.email && (
+                                                            <p className="text-xs text-gray-500">{student.email}</p>
+                                                        )}
                                                         <p className="text-xs text-gray-500">
                                                             Matriculado el {new Date(student.joined_at).toLocaleDateString()}
                                                         </p>

@@ -12,9 +12,17 @@ interface Resource {
 
 interface StudentResourceListProps {
     classId: string
+    compact?: boolean
 }
 
-export default function StudentResourceList({ classId }: StudentResourceListProps) {
+const resourceTypeLabels: Record<string, string> = {
+    link: 'ENLACE',
+    video: 'VIDEO',
+    file: 'ARCHIVO',
+    doc: 'ARCHIVO'
+}
+
+export default function StudentResourceList({ classId, compact = false }: StudentResourceListProps) {
     const [resources, setResources] = useState<Resource[]>([])
     const [loading, setLoading] = useState(true)
 
@@ -37,14 +45,14 @@ export default function StudentResourceList({ classId }: StudentResourceListProp
     }
 
     return (
-        <div className="mt-4 pt-4 border-t border-neutral-800">
+        <div className={`${compact ? 'pt-4' : 'mt-4 pt-4'} border-t border-neutral-800`}>
             <h4 className="text-sm font-semibold text-gray-300 mb-3">Recursos ({resources.length})</h4>
             <div className="space-y-2">
                 {resources.map(res => (
                     <div key={res.id} className="flex justify-between items-center group/res bg-black/30 p-2 rounded hover:bg-black/50 transition-colors">
                         <a href={res.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 overflow-hidden w-full">
                             <span className="text-xs bg-neutral-800 text-gray-400 px-1 rounded uppercase tracking-wider scale-90 origin-left shrink-0">
-                                {res.type}
+                                {resourceTypeLabels[res.type] || res.type}
                             </span>
                             <span className="text-sm text-indigo-400 hover:underline truncate">
                                 {res.title}

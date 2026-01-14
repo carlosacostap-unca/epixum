@@ -217,6 +217,22 @@ async function checkStudentAccess(courseId: string) {
         }
     )
 
+    // Check if supervisor
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('roles')
+        .eq('email', user.email)
+        .single()
+
+    if (profile?.roles?.includes('supervisor')) {
+        // Return dummy enrollment for supervisor (no team)
+        return { 
+            supabase: adminClient, 
+            user, 
+            enrollment: { id: 'supervisor-bypass', team_id: null } 
+        }
+    }
+
     // Check if user is enrolled as student in this course
     const { data: enrollment, error } = await adminClient
         .from('course_enrollments')

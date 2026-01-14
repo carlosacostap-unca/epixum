@@ -105,6 +105,23 @@ export async function getSprints(courseId: string) {
                  if (error) throw error
                  return { success: true, data }
             }
+
+            // Check if supervisor
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('roles')
+                .eq('email', user.email)
+                .single()
+
+            if (profile?.roles?.includes('supervisor')) {
+                 const { data, error } = await adminClient
+                    .from('sprints')
+                    .select('*')
+                    .eq('course_id', courseId)
+                    .order('start_date', { ascending: true })
+                 if (error) throw error
+                 return { success: true, data }
+            }
         }
         
         const { data, error } = await supabase

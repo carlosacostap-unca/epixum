@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import ProfileManager from '@/components/ProfileManager'
+import { formatDateForDisplay } from '@/utils/date'
 
 interface Course {
     id: string
@@ -9,6 +10,8 @@ interface Course {
     description: string
     institution_id: string
     institution_name: string
+    start_date?: string
+    end_date?: string
 }
 
 export default function NonTeachingStaffDashboard({ 
@@ -80,6 +83,16 @@ export default function NonTeachingStaffDashboard({
                                             <p className="text-sm text-gray-500 line-clamp-3">
                                                 {course.description || 'Sin descripción disponible.'}
                                             </p>
+                                            <div className="flex flex-col gap-1 mt-3 text-xs text-gray-500 border-t border-neutral-700 pt-3">
+                                                <div className="flex justify-between">
+                                                    <span className="font-semibold uppercase text-[10px] tracking-wider">Inicio</span>
+                                                    <span>{course.start_date ? formatDateForDisplay(course.start_date, 'dd/MM/yyyy') : '-'}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="font-semibold uppercase text-[10px] tracking-wider">Fin</span>
+                                                    <span>{course.end_date ? formatDateForDisplay(course.end_date, 'dd/MM/yyyy') : '-'}</span>
+                                                </div>
+                                            </div>
                                         </div>
                                     </Link>
                                 ))}

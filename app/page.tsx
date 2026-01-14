@@ -5,7 +5,7 @@ import RoleSelectionScreen from '@/components/RoleSelectionScreen'
 import NonTeachingStaffDashboard from '@/components/NonTeachingStaffDashboard'
 import ProfileManager from '@/components/ProfileManager'
 import { getInstitutionsForUser } from '@/app/actions/institutions'
-import { getTeacherCourses, getStudentCourses, getNodocenteCourses } from '@/app/actions/courses'
+import { getTeacherCourses, getStudentCourses, getNodocenteCourses, getSupervisorCourses } from '@/app/actions/courses'
 import TeacherDashboard from '@/components/TeacherDashboard'
 import StudentDashboard from '@/components/StudentDashboard'
 
@@ -121,6 +121,23 @@ export default async function Home(props: {
                         </div>
                     </div>
                 </a>
+
+                {/* Card Gestionar Datos */}
+                <a href="/admin/data" className="block group">
+                    <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6 hover:bg-neutral-800 transition-all h-full flex flex-col justify-between">
+                        <div>
+                            <h2 className="text-xl font-bold text-gray-100 group-hover:text-indigo-400 transition-colors mb-2">
+                                Gestionar Datos
+                            </h2>
+                            <p className="text-gray-400">
+                                Gestión manual de Clases y otros recursos del sistema.
+                            </p>
+                        </div>
+                        <div className="mt-4 text-indigo-400 text-sm font-medium group-hover:translate-x-1 transition-transform">
+                            Ir a Gestionar →
+                        </div>
+                    </div>
+                </a>
             </div>
           </main>
         </div>
@@ -202,6 +219,30 @@ export default async function Home(props: {
 
   if (effectiveRole === 'estudiante') {
       const coursesResult = await getStudentCourses()
+      const courses = coursesResult.success && coursesResult.data ? coursesResult.data : []
+      
+      return (
+             <StudentDashboard 
+                courses={courses} 
+                userEmail={user.email || ''} 
+                profile={{
+                    id: user.id,
+                    email: user.email || '',
+                    first_name: profile?.first_name,
+                    last_name: profile?.last_name,
+                    dni: profile?.dni,
+                    birth_date: profile?.birth_date,
+                    phone: profile?.phone,
+                    roles: profile?.roles,
+                    avatar_url: profile?.avatar_url
+                }}
+                hasMultipleRoles={hasMultipleRoles}
+             />
+      )
+  }
+
+  if (effectiveRole === 'supervisor') {
+      const coursesResult = await getSupervisorCourses()
       const courses = coursesResult.success && coursesResult.data ? coursesResult.data : []
       
       return (

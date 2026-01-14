@@ -6,6 +6,7 @@ import StudentAssignmentList from './StudentAssignmentList'
 import SprintList from './SprintList'
 import StudentTeamView from './StudentTeamView'
 import StudentReviewManagement from './StudentReviewManagement'
+import CourseQueriesTab from './CourseQueriesTab'
 
 interface ClassItem {
     id: string
@@ -121,6 +122,16 @@ export default function StudentCourseView({
                 >
                     Trabajos Prácticos
                 </button>
+                <button
+                    onClick={() => setActiveTab('queries')}
+                    className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
+                        activeTab === 'queries' 
+                            ? 'border-indigo-500 text-indigo-400' 
+                            : 'border-transparent text-gray-400 hover:text-gray-200'
+                    }`}
+                >
+                    Consultas
+                </button>
             </div>
 
             {activeTab === 'classes' && hasClasses && (
@@ -152,6 +163,16 @@ export default function StudentCourseView({
                     courseId={courseId} 
                     assignments={assignments} 
                     initialSubmissions={initialSubmissions}
+                />
+            )}
+
+            {activeTab === 'queries' && (
+                <CourseQueriesTab
+                    courseId={courseId}
+                    classes={classes}
+                    assignments={assignments}
+                    currentUserEmail={currentUserEmail}
+                    isTeacher={false}
                 />
             )}
         </div>

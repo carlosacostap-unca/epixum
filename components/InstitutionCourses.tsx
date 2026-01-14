@@ -8,6 +8,8 @@ interface Course {
     name: string
     description: string
     created_at: string
+    start_date?: string | null
+    end_date?: string | null
 }
 
 interface User {
@@ -236,6 +238,13 @@ export default function InstitutionCourses({ institutionId, institutionName, onB
                         <div key={course.id} className="bg-neutral-800 p-5 rounded border border-neutral-700 hover:border-indigo-500 transition-colors">
                             <h3 className="text-xl font-semibold text-gray-200">{course.name}</h3>
                             <p className="text-gray-400 text-sm mt-1">{course.description}</p>
+                            {(course.start_date || course.end_date) && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                    {course.start_date && new Date(course.start_date).toLocaleDateString()} 
+                                    {course.start_date && course.end_date && ' - '}
+                                    {course.end_date && new Date(course.end_date).toLocaleDateString()}
+                                </p>
+                            )}
                             <div className="mt-4 pt-4 border-t border-neutral-700">
                                 <button 
                                     onClick={() => handleSelectCourse(course)}

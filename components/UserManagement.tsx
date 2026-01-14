@@ -20,7 +20,8 @@ const AVAILABLE_ROLES = [
   'docente',
   'nodocente',
   'admin-institucion',
-  'admin-plataforma'
+  'admin-plataforma',
+  'supervisor'
 ]
 
 const ROLE_LABELS: Record<string, string> = {
@@ -28,7 +29,8 @@ const ROLE_LABELS: Record<string, string> = {
   'docente': 'Docente',
   'nodocente': 'Nodocente',
   'admin-institucion': 'Admin Institución',
-  'admin-plataforma': 'Admin Plataforma'
+  'admin-plataforma': 'Admin Plataforma',
+  'supervisor': 'Supervisor'
 }
 
 export default function UserManagement({ initialUsers }: { initialUsers: any[] }) {
@@ -60,6 +62,20 @@ export default function UserManagement({ initialUsers }: { initialUsers: any[] }
 
   // Edit State
   const [editingUser, setEditingUser] = useState<User | null>(null)
+  
+  // Search State
+  const [searchTerm, setSearchTerm] = useState('')
+
+  // Filtered Users
+  const filteredUsers = users.filter(user => {
+    const term = searchTerm.toLowerCase()
+    return (
+        user.email.toLowerCase().includes(term) ||
+        (user.first_name?.toLowerCase() || '').includes(term) ||
+        (user.last_name?.toLowerCase() || '').includes(term) ||
+        (user.dni || '').includes(term)
+    )
+  })
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
@@ -350,6 +366,16 @@ export default function UserManagement({ initialUsers }: { initialUsers: any[] }
       )}
 
       {/* Users List */}
+      <div className="mb-4">
+        <input
+            type="text"
+            placeholder="Buscar por email, nombre, apellido o DNI..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full px-4 py-2 bg-neutral-800 border border-neutral-700 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-white placeholder-gray-500"
+        />
+      </div>
+
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-neutral-800">
           <thead className="bg-neutral-800">
@@ -361,7 +387,7 @@ export default function UserManagement({ initialUsers }: { initialUsers: any[] }
             </tr>
           </thead>
           <tbody className="bg-neutral-900 divide-y divide-neutral-800">
-            {users.map((user) => (
+            {filteredUsers.map((user) => (
               <tr key={user.email}>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-200 align-top">
                   <div>{user.email}</div>
@@ -416,10 +442,10 @@ export default function UserManagement({ initialUsers }: { initialUsers: any[] }
                 </td>
               </tr>
             ))}
-            {users.length === 0 && (
+            {filteredUsers.length === 0 && (
                 <tr>
                     <td colSpan={4} className="px-6 py-4 text-center text-gray-500">
-                        No hay usuarios registrados en la whitelist.
+                        {searchTerm ? 'No se encontraron usuarios que coincidan con la búsqueda.' : 'No hay usuarios registrados en la whitelist.'}
                     </td>
                 </tr>
             )}

@@ -3,6 +3,7 @@ import { getCourse } from '@/app/actions/courses'
 import { redirect } from 'next/navigation'
 import CourseSettings from '@/components/CourseSettings'
 import CourseStatusSelector from '@/components/CourseStatusSelector'
+import CourseDetailsEditor from '@/components/CourseDetailsEditor'
 
 export default async function CourseDetailsPage(props: { params: Promise<{ id: string, courseId: string }> }) {
     const params = await props.params;
@@ -93,13 +94,7 @@ export default async function CourseDetailsPage(props: { params: Promise<{ id: s
             <div className="w-full max-w-6xl">
                 <div className="mb-8 flex flex-col gap-2">
                     <div className="flex justify-between items-center">
-                        <div>
-                            <div className="flex items-center gap-3">
-                                <h1 className="text-3xl font-bold text-gray-100">{course.name}</h1>
-                                <CourseStatusSelector courseId={course.id} initialStatus={course.status || 'Borrador'} />
-                            </div>
-                            <p className="text-gray-500 mt-1">{course.description || 'Sin descripción'}</p>
-                        </div>
+                        <CourseDetailsEditor course={course} />
                         <a href={`/institution/${institutionId}/courses`} className="text-indigo-400 hover:text-indigo-300 hover:underline text-sm">
                             ← Volver a Cursos
                         </a>

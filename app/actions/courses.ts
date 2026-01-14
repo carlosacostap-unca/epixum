@@ -410,6 +410,29 @@ export async function updateCourseStatus(courseId: string, status: string) {
     }
 }
 
+export async function updateCourseDetails(courseId: string, data: { name: string, description: string, start_date: string, end_date: string }) {
+    try {
+        const { supabase } = await checkInstitutionAdmin()
+        
+        const { error } = await supabase
+            .from('courses')
+            .update({ 
+                name: data.name,
+                description: data.description,
+                start_date: data.start_date,
+                end_date: data.end_date
+            })
+            .eq('id', courseId)
+
+        if (error) throw error
+        
+        revalidatePath(`/institution/[id]/courses/${courseId}`)
+        return { success: true }
+    } catch (error: unknown) {
+        return { success: false, error: (error as Error).message }
+    }
+}
+
 export async function getTeacherCourses() {
     try {
         const supabase = await createClient()
@@ -437,6 +460,8 @@ export async function getTeacherCourses() {
                     id,
                     name,
                     description,
+                    start_date,
+                    end_date,
                     institution_id,
                     instituciones (
                         nombre
@@ -460,6 +485,8 @@ export async function getTeacherCourses() {
                 id: course.id,
                 name: course.name,
                 description: course.description,
+                start_date: course.start_date,
+                end_date: course.end_date,
                 institution_id: course.institution_id,
                 // @ts-ignore
                 institution_name: course.instituciones?.nombre
@@ -499,6 +526,8 @@ export async function getNodocenteCourses() {
                     id,
                     name,
                     description,
+                    start_date,
+                    end_date,
                     institution_id,
                     instituciones (
                         nombre
@@ -522,6 +551,8 @@ export async function getNodocenteCourses() {
                 id: course.id,
                 name: course.name,
                 description: course.description,
+                start_date: course.start_date,
+                end_date: course.end_date,
                 institution_id: course.institution_id,
                 // @ts-ignore
                 institution_name: course.instituciones?.nombre
@@ -540,9 +571,15 @@ export async function createCourse(formData: FormData) {
     const description = formData.get('description') as string
     const structureType = formData.get('structure_type') as string
     const hasTeams = formData.get('has_teams') === 'on'
+    const start_date = formData.get('start_date') as string
+    const end_date = formData.get('end_date') as string
     
     if (!institutionId || !name) {
         return { success: false, error: 'Faltan campos requeridos' }
+    }
+
+    if (!start_date || !end_date) {
+        return { success: false, error: 'Las fechas de inicio y fin son obligatorias' }
     }
 
     // Determine flags based on structure type
@@ -560,7 +597,9 @@ export async function createCourse(formData: FormData) {
                 description,
                 has_classes,
                 has_sprints,
-                has_teams: hasTeams
+                has_teams: hasTeams,
+                start_date: start_date,
+                end_date: end_date
             })
 
         if (error) throw error
@@ -687,6 +726,8 @@ export async function getStudentCourses() {
                     id,
                     name,
                     description,
+                    start_date,
+                    end_date,
                     institution_id,
                     instituciones (
                         nombre
@@ -710,6 +751,8 @@ export async function getStudentCourses() {
                 id: course.id,
                 name: course.name,
                 description: course.description,
+                start_date: course.start_date,
+                end_date: course.end_date,
                 institution_id: course.institution_id,
                 // @ts-ignore
                 institution_name: course.instituciones?.nombre
@@ -945,7 +988,7 @@ export async function getCourseStudentsForNodocente(courseId: string) {
         // 1. Get enrollments
         const { data: enrollments, error: enrollError } = await supabase
             .from('course_enrollments')
-            .select('email')
+            .select('email, created_at')
             .eq('course_id', courseId)
             .eq('role', 'estudiante')
             
@@ -960,7 +1003,7 @@ export async function getCourseStudentsForNodocente(courseId: string) {
         // 2. Get Profiles (for names, dni, phone)
         const { data: profiles, error: profileError } = await supabase
             .from('profiles')
-            .select('email, first_name, last_name, dni, phone, birth_date, avatar_url')
+            .select('id, email, first_name, last_name, dni, phone, birth_date, avatar_url')
             .in('email', emails)
 
         if (profileError) throw profileError
@@ -989,7 +1032,8 @@ export async function getCourseStudentsForNodocente(courseId: string) {
         const authMap = new Map(authUsers.map(u => [u.email, u]))
 
         // 4. Combine data
-        const students = emails.map(email => {
+        const students = enrollments.map(enrollment => {
+            const email = enrollment.email
             const profile = profileMap.get(email)
             const authUser = authMap.get(email)
             
@@ -997,7 +1041,9 @@ export async function getCourseStudentsForNodocente(courseId: string) {
             const isVerified = !!authUser?.last_sign_in_at
 
             return {
+                id: profile?.id || email,
                 email,
+                created_at: enrollment.created_at,
                 first_name: profile?.first_name || '',
                 last_name: profile?.last_name || '',
                 dni: profile?.dni || '',
@@ -1351,6 +1397,69 @@ export async function getCourseForNodocente(courseId: string) {
 
         if (error) throw error
         return { success: true, data }
+    } catch (error: unknown) {
+        return { success: false, error: (error as Error).message }
+    }
+}
+
+export async function getSupervisorCourses() {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+
+        if (!user || !user.email) throw new Error('No autenticado')
+        
+        // Verify supervisor role
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('roles')
+            .eq('email', user.email)
+            .single()
+            
+        if (!profile?.roles?.includes('supervisor')) {
+             throw new Error('No autorizado: Requiere rol de Supervisor')
+        }
+
+        const adminClient = createAdminClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!,
+            {
+                auth: {
+                    autoRefreshToken: false,
+                    persistSession: false
+                }
+            }
+        )
+
+        // Fetch all active courses
+        const { data, error } = await adminClient
+            .from('courses')
+            .select(`
+                id,
+                name,
+                description,
+                status,
+                institution_id,
+                instituciones (
+                    nombre
+                )
+            `)
+            .neq('status', 'Borrador')
+            .order('created_at', { ascending: false })
+            
+        if (error) throw error
+        
+        const courses = data.map(course => ({
+            id: course.id,
+            name: course.name,
+            description: course.description,
+            status: course.status,
+            institution_id: course.institution_id,
+            // @ts-ignore
+            institution_name: course.instituciones?.nombre
+        }))
+
+        return { success: true, data: courses }
     } catch (error: unknown) {
         return { success: false, error: (error as Error).message }
     }

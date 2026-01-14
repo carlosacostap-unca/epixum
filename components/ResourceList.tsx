@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getClassResources, createResource, deleteResource, getSignedUploadUrl } from '@/app/actions/resources'
+import { getClassResources, createResource, deleteResource, getSignedUploadUrl, updateResource } from '@/app/actions/resources'
 import { createClient } from '@/utils/supabase/client'
 
 interface Resource {
@@ -13,6 +13,13 @@ interface Resource {
 
 interface ResourceListProps {
     classId: string
+}
+
+const resourceTypeLabels: Record<string, string> = {
+    link: 'ENLACE',
+    video: 'VIDEO',
+    file: 'ARCHIVO',
+    doc: 'ARCHIVO'
 }
 
 export default function ResourceList({ classId }: ResourceListProps) {
@@ -29,6 +36,12 @@ export default function ResourceList({ classId }: ResourceListProps) {
     const [mode, setMode] = useState<'url' | 'file'>('url')
     const [file, setFile] = useState<File | null>(null)
     const [isUploading, setIsUploading] = useState(false)
+
+    // Editing logic
+    const [editingId, setEditingId] = useState<string | null>(null)
+    const [editTitle, setEditTitle] = useState('')
+    const [editUrl, setEditUrl] = useState('')
+    const [editType, setEditType] = useState('link')
 
     useEffect(() => {
         loadResources()
@@ -108,6 +121,33 @@ export default function ResourceList({ classId }: ResourceListProps) {
         }
     }
 
+    const startEditing = (res: Resource) => {
+        setEditingId(res.id)
+        setEditTitle(res.title)
+        setEditUrl(res.url)
+        setEditType(res.type)
+    }
+
+    const cancelEditing = () => {
+        setEditingId(null)
+        setEditTitle('')
+        setEditUrl('')
+        setEditType('link')
+    }
+
+    async function handleUpdate(e: React.FormEvent) {
+        e.preventDefault()
+        if (!editingId || !editTitle || !editUrl) return
+
+        const result = await updateResource(editingId, editTitle, editUrl, editType)
+        if (result.success) {
+            cancelEditing()
+            loadResources()
+        } else {
+            alert(result.error || 'Error al actualizar el recurso')
+        }
+    }
+
     if (loading) return <div className="text-xs text-gray-500">Cargando recursos...</div>
 
     return (
@@ -166,9 +206,9 @@ export default function ResourceList({ classId }: ResourceListProps) {
                                 value={type}
                                 onChange={e => setType(e.target.value)}
                             >
-                                <option value="link">Link</option>
-                                <option value="video">Video</option>
-                                <option value="doc">Doc</option>
+                                <option value="link">ENLACE</option>
+                                <option value="video">VIDEO</option>
+                                <option value="doc">ARCHIVO</option>
                             </select>
                         </div>
                     ) : (
@@ -197,24 +237,85 @@ export default function ResourceList({ classId }: ResourceListProps) {
                 {resources.length === 0 && !isAdding && (
                     <p className="text-xs text-gray-600 italic">No hay recursos asignados.</p>
                 )}
-                {resources.map(res => (
-                    <div key={res.id} className="flex justify-between items-center group/res bg-black/30 p-2 rounded hover:bg-black/50 transition-colors">
-                        <a href={res.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 overflow-hidden">
-                            <span className="text-xs bg-neutral-800 text-gray-400 px-1 rounded uppercase tracking-wider scale-90 origin-left">
-                                {res.type}
-                            </span>
-                            <span className="text-sm text-indigo-400 hover:underline truncate">
-                                {res.title}
-                            </span>
-                        </a>
-                        <button 
-                            onClick={() => handleDelete(res.id)}
-                            className="text-red-900 group-hover/res:text-red-500 text-xs px-2 opacity-0 group-hover/res:opacity-100 transition-all"
-                        >
-                            ×
-                        </button>
-                    </div>
-                ))}
+                {resources.map(res => {
+                    if (editingId === res.id) {
+                        return (
+                            <form key={res.id} onSubmit={handleUpdate} className="bg-neutral-950 p-2 rounded border border-neutral-800 space-y-2">
+                                <input 
+                                    type="text" 
+                                    placeholder="Título del recurso"
+                                    className="w-full bg-black border border-neutral-700 rounded p-1 text-sm text-gray-200"
+                                    value={editTitle}
+                                    onChange={e => setEditTitle(e.target.value)}
+                                    required
+                                />
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="text" 
+                                        placeholder="URL"
+                                        className="flex-1 bg-black border border-neutral-700 rounded p-1 text-sm text-gray-200"
+                                        value={editUrl}
+                                        onChange={e => setEditUrl(e.target.value)}
+                                        required
+                                    />
+                                    <select 
+                                        className="bg-black border border-neutral-700 rounded p-1 text-sm text-gray-200 w-24"
+                                        value={editType}
+                                        onChange={e => setEditType(e.target.value)}
+                                    >
+                                        <option value="link">ENLACE</option>
+                                        <option value="video">VIDEO</option>
+                                        <option value="doc">ARCHIVO</option>
+                                    </select>
+                                </div>
+                                <div className="flex justify-end gap-2">
+                                    <button 
+                                        type="button"
+                                        onClick={cancelEditing}
+                                        className="text-xs text-gray-400 hover:text-white px-2 py-1"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button 
+                                        type="submit"
+                                        className="bg-indigo-600 text-white text-xs px-3 py-1 rounded hover:bg-indigo-700"
+                                    >
+                                        Guardar
+                                    </button>
+                                </div>
+                            </form>
+                        )
+                    }
+
+                    return (
+                        <div key={res.id} className="flex justify-between items-center group/res bg-black/30 p-2 rounded hover:bg-black/50 transition-colors">
+                            <a href={res.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 overflow-hidden flex-1">
+                                <span className="text-xs bg-neutral-800 text-gray-400 px-1 rounded uppercase tracking-wider scale-90 origin-left">
+                                    {resourceTypeLabels[res.type] || res.type}
+                                </span>
+                                <span className="text-sm text-indigo-400 hover:underline truncate">
+                                    {res.title}
+                                </span>
+                            </a>
+                            <div className="flex gap-2 opacity-0 group-hover/res:opacity-100 transition-all">
+                                <button 
+                                    onClick={() => startEditing(res)}
+                                    className="text-gray-400 hover:text-indigo-400 text-xs px-1"
+                                    title="Editar"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                                </button>
+                                <button 
+                                    onClick={() => handleDelete(res.id)}
+                                    className="text-red-900 hover:text-red-500 text-xs px-1"
+                                    title="Eliminar"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                    )
+                })}
             </div>
         </div>
     )

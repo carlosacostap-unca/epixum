@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createCourse } from '@/app/actions/courses'
+import { formatDateForDisplay, toUTC } from '@/utils/date'
 
 type Course = {
     id: string
@@ -10,6 +11,8 @@ type Course = {
     description: string | null
     institution_id: string
     status: string | null
+    start_date: string | null
+    end_date: string | null
 }
 
 function getStatusColor(status: string | null) {
@@ -75,15 +78,45 @@ export default function CourseManagement({
                 <p className="text-sm text-gray-400 line-clamp-3">
                     {course.description || 'Sin descripción'}
                 </p>
+                <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                    </svg>
+                    {course.start_date ? (
+                        <span>{formatDateForDisplay(course.start_date, 'dd/MM/yyyy')}</span>
+                    ) : (
+                        <span className="italic text-gray-600">Sin inicio</span>
+                    )}
+                    <span>-</span>
+                    {course.end_date ? (
+                        <span>{formatDateForDisplay(course.end_date, 'dd/MM/yyyy')}</span>
+                    ) : (
+                        <span className="italic text-gray-600">Sin fin</span>
+                    )}
+                </div>
             </div>
         </div>
     )
 
-    const CreateCourseModal = () => (
+    const CreateCourseModal = () => {
+        async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+            e.preventDefault()
+            const formData = new FormData(e.currentTarget)
+            
+            const startDate = formData.get('start_date') as string
+            const endDate = formData.get('end_date') as string
+            
+            if (startDate) formData.set('start_date', toUTC(startDate + 'T00:00'))
+            if (endDate) formData.set('end_date', toUTC(endDate + 'T23:59:59'))
+            
+            await handleCreateCourse(formData)
+        }
+
+        return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
             <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
                 <h3 className="text-xl font-bold text-gray-100 mb-6">Nuevo Curso</h3>
-                <form action={handleCreateCourse} className="flex flex-col gap-4">
+                <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                     <input type="hidden" name="institutionId" value={institutionId} />
                     
                     <div className="flex flex-col gap-1">
@@ -104,6 +137,27 @@ export default function CourseManagement({
                             className="bg-neutral-950 border border-neutral-700 rounded px-3 py-2 text-sm text-white w-full focus:outline-none focus:border-indigo-500 resize-none"
                             rows={3}
                         />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-1">
+                            <label className="text-xs text-gray-500 font-medium uppercase tracking-wider">Fecha Inicio</label>
+                            <input 
+                                type="date" 
+                                name="start_date"
+                                required
+                                className="bg-neutral-950 border border-neutral-700 rounded px-3 py-2 text-sm text-white w-full focus:outline-none focus:border-indigo-500"
+                            />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <label className="text-xs text-gray-500 font-medium uppercase tracking-wider">Fecha Fin</label>
+                            <input 
+                                type="date" 
+                                name="end_date"
+                                required
+                                className="bg-neutral-950 border border-neutral-700 rounded px-3 py-2 text-sm text-white w-full focus:outline-none focus:border-indigo-500"
+                            />
+                        </div>
                     </div>
                     
                     <div className="flex flex-col gap-2">
@@ -161,6 +215,7 @@ export default function CourseManagement({
             </div>
         </div>
     )
+    }
 
     return (
         <div className="space-y-8">

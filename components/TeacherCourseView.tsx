@@ -7,6 +7,7 @@ import TeacherStudentManagement from './TeacherStudentManagement'
 import SprintManagement from './SprintManagement'
 import SprintReviewManagement from './SprintReviewManagement'
 import TeamManagement from './TeamManagement'
+import CourseQueriesTab from './CourseQueriesTab'
 
 interface TeacherCourseViewProps {
     courseId: string
@@ -101,6 +102,16 @@ export default function TeacherCourseView({
                     Trabajos Prácticos
                 </button>
                 <button
+                    onClick={() => setActiveTab('queries')}
+                    className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
+                        activeTab === 'queries' 
+                            ? 'border-indigo-500 text-indigo-400' 
+                            : 'border-transparent text-gray-400 hover:text-gray-200'
+                    }`}
+                >
+                    Consultas
+                </button>
+                <button
                     onClick={() => setActiveTab('students')}
                     className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
                         activeTab === 'students' 
@@ -149,6 +160,16 @@ export default function TeacherCourseView({
                     courseId={courseId}
                     initialAssignments={initialAssignments}
                     sprints={initialSprints}
+                />
+            )}
+
+            {activeTab === 'queries' && (
+                <CourseQueriesTab
+                    courseId={courseId}
+                    classes={initialClasses}
+                    assignments={initialAssignments}
+                    currentUserEmail={currentUserEmail}
+                    isTeacher={true}
                 />
             )}
             

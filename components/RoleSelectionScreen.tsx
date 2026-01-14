@@ -12,7 +12,8 @@ const ROLE_NAMES: Record<string, string> = {
   'admin-institucion': 'Administrador de Institución',
   'docente': 'Docente',
   'nodocente': 'No Docente',
-  'estudiante': 'Estudiante'
+  'estudiante': 'Estudiante',
+  'supervisor': 'Supervisor'
 }
 
 const ROLE_DESCRIPTIONS: Record<string, string> = {
@@ -20,7 +21,8 @@ const ROLE_DESCRIPTIONS: Record<string, string> = {
   'admin-institucion': 'Gestión de tu institución asignada y sus recursos.',
   'docente': 'Acceso a cursos, calificaciones y material educativo.',
   'nodocente': 'Funciones administrativas y de soporte.',
-  'estudiante': 'Acceso a tus cursos y progreso académico.'
+  'estudiante': 'Acceso a tus cursos y progreso académico.',
+  'supervisor': 'Visualización de cursos como estudiante.'
 }
 
 export default function RoleSelectionScreen({ roles, userEmail }: RoleSelectionScreenProps) {

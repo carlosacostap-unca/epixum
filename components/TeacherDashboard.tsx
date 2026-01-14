@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import ProfileManager from '@/components/ProfileManager'
+import { formatDateForDisplay } from '@/utils/date'
 
 interface Course {
     id: string
@@ -10,6 +11,8 @@ interface Course {
     description: string
     institution_name: string
     status?: string
+    start_date?: string
+    end_date?: string
 }
 
 interface TeacherDashboardProps {
@@ -58,6 +61,16 @@ export default function TeacherDashboard({ courses, userEmail, profile, hasMulti
                     <p className="text-gray-400 text-sm mb-6 line-clamp-2">
                         {course.description || 'Sin descripción'}
                     </p>
+                    <div className="flex gap-4 text-xs text-gray-500 mt-1 mb-4">
+                        <div>
+                            <span className="font-semibold text-gray-600 uppercase mr-1">Inicio:</span>
+                            {course.start_date ? formatDateForDisplay(course.start_date, 'dd/MM/yyyy') : 'Sin fecha'}
+                        </div>
+                        <div>
+                            <span className="font-semibold text-gray-600 uppercase mr-1">Fin:</span>
+                            {course.end_date ? formatDateForDisplay(course.end_date, 'dd/MM/yyyy') : 'Sin fecha'}
+                        </div>
+                    </div>
                 </div>
             </div>
         </Link>
