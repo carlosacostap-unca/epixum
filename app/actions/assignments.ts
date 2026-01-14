@@ -123,7 +123,7 @@ export async function createAssignment(courseId: string, title: string, descript
             throw new Error('No tienes permisos de docente en este curso')
         }
 
-        const { error } = await adminClient
+        const { data, error } = await adminClient
             .from('assignments')
             .insert({
                 course_id: courseId,
@@ -132,11 +132,13 @@ export async function createAssignment(courseId: string, title: string, descript
                 due_date: dueDate,
                 sprint_id: sprintId || null
             })
+            .select()
+            .single()
 
         if (error) throw error
         
         revalidatePath(`/teacher/courses/${courseId}`)
-        return { success: true }
+        return { success: true, data }
     } catch (error: unknown) {
         return { success: false, error: (error as Error).message }
     }
@@ -403,6 +405,140 @@ export async function createAssignmentResource(assignmentId: string, title: stri
             })
 
         if (error) throw error
+        return { success: true }
+    } catch (error: unknown) {
+        return { success: false, error: (error as Error).message }
+    }
+}
+
+export async function deleteSubmission(submissionId: string) {
+    try {
+        const { user } = await checkAuth()
+        const adminClient = getAdminClient()
+
+        // Get submission to find file_url and verify permissions
+        const { data: submission } = await adminClient
+            .from('assignment_submissions')
+            .select('*, assignments!inner(course_id)')
+            .eq('id', submissionId)
+            .single()
+
+        if (!submission) throw new Error('Entrega no encontrada')
+
+        // Verify teacher enrollment
+        const { data: teacherEnrollment } = await adminClient
+            .from('course_enrollments')
+            .select('id')
+            .eq('course_id', submission.assignments.course_id)
+            .ilike('email', user.email!)
+            .eq('role', 'docente')
+            .single()
+
+        if (!teacherEnrollment) {
+            throw new Error('No tienes permisos de docente en este curso')
+        }
+
+        // Delete file from storage if exists
+        if (submission.file_url) {
+            try {
+                const bucketName = 'assignment-submissions'
+                if (submission.file_url.includes(`/${bucketName}/`)) {
+                    const pathParts = submission.file_url.split(`/${bucketName}/`)
+                    if (pathParts.length > 1) {
+                        const filePath = decodeURIComponent(pathParts[1])
+                        const { error: storageError } = await adminClient
+                            .storage
+                            .from(bucketName)
+                            .remove([filePath])
+                        
+                        if (storageError) {
+                            console.error('Error deleting file from storage:', storageError)
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('Error processing storage deletion:', e)
+            }
+        }
+
+        // Delete submission record
+        const { error } = await adminClient
+            .from('assignment_submissions')
+            .delete()
+            .eq('id', submissionId)
+
+        if (error) throw error
+
+        revalidatePath(`/teacher/courses/${submission.assignments.course_id}`)
+        return { success: true }
+    } catch (error: unknown) {
+        return { success: false, error: (error as Error).message }
+    }
+}
+
+export async function updateSubmissionContent(submissionId: string, content: string, fileUrl: string | null) {
+    try {
+        const { user } = await checkAuth()
+        const adminClient = getAdminClient()
+
+        // Get submission to find old file_url and verify permissions
+        const { data: submission } = await adminClient
+            .from('assignment_submissions')
+            .select('*, assignments!inner(course_id)')
+            .eq('id', submissionId)
+            .single()
+
+        if (!submission) throw new Error('Entrega no encontrada')
+
+        // Verify teacher enrollment
+        const { data: teacherEnrollment } = await adminClient
+            .from('course_enrollments')
+            .select('id')
+            .eq('course_id', submission.assignments.course_id)
+            .ilike('email', user.email!)
+            .eq('role', 'docente')
+            .single()
+
+        if (!teacherEnrollment) {
+            throw new Error('No tienes permisos de docente en este curso')
+        }
+
+        // Delete old file from storage if new file is different and old file exists
+        if (submission.file_url && fileUrl && submission.file_url !== fileUrl) {
+            try {
+                const bucketName = 'assignment-submissions'
+                if (submission.file_url.includes(`/${bucketName}/`)) {
+                    const pathParts = submission.file_url.split(`/${bucketName}/`)
+                    if (pathParts.length > 1) {
+                        const filePath = decodeURIComponent(pathParts[1])
+                        const { error: storageError } = await adminClient
+                            .storage
+                            .from(bucketName)
+                            .remove([filePath])
+                        
+                        if (storageError) {
+                            console.error('Error deleting old file from storage:', storageError)
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('Error processing storage deletion:', e)
+            }
+        }
+
+        // Update submission record
+        const { error } = await adminClient
+            .from('assignment_submissions')
+            .update({
+                content,
+                file_url: fileUrl,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', submissionId)
+
+        if (error) throw error
+
+        revalidatePath(`/teacher/courses/${submission.assignments.course_id}`)
         return { success: true }
     } catch (error: unknown) {
         return { success: false, error: (error as Error).message }

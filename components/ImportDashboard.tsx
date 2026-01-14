@@ -5,7 +5,8 @@ import { getInstitutions } from '@/app/actions/institutions'
 import { getCourses } from '@/app/actions/courses'
 import { getClasses, createClass } from '@/app/actions/classes'
 import { getClassResources, createResource, updateResource, deleteResource, getSignedUploadUrl } from '@/app/actions/resources'
-import { extractResourcesFromText } from '@/app/actions/ai'
+import { getAssignments, createAssignment, deleteAssignment, getAssignmentResources, createAssignmentResource, deleteAssignmentResource } from '@/app/actions/assignments'
+import { extractResourcesFromText, extractAssignmentFromText } from '@/app/actions/ai'
 import Link from 'next/link'
 import { formatDateForDisplay } from '@/utils/date'
 
@@ -57,11 +58,140 @@ export default function ImportDashboard() {
     const [creatingClass, setCreatingClass] = useState(false)
     const [createError, setCreateError] = useState<string | null>(null)
 
+    // Assignments State
+    const [assignments, setAssignments] = useState<any[]>([])
+    const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
+    const [assignmentResources, setAssignmentResources] = useState<any[]>([])
+    
+    // Import Assignment State
+    const [isImportingAssignment, setIsImportingAssignment] = useState(false)
+    const [importAssignmentText, setImportAssignmentText] = useState('')
+    const [processingAssignmentImport, setProcessingAssignmentImport] = useState(false)
+    const [proposedAssignment, setProposedAssignment] = useState<any | null>(null)
+
     useEffect(() => {
         if (activeTab === 'classes') {
             loadInstitutions()
         }
     }, [activeTab])
+
+    useEffect(() => {
+        if (selectedCourse && activeTab === 'assignments') {
+            loadAssignments(selectedCourse)
+        }
+    }, [activeTab, selectedCourse])
+
+    useEffect(() => {
+        if (selectedAssignmentId) {
+            loadAssignmentResources(selectedAssignmentId)
+        } else {
+            setAssignmentResources([])
+        }
+    }, [selectedAssignmentId])
+
+    async function loadAssignments(courseId: string) {
+        setLoading(true)
+        const res = await getAssignments(courseId)
+        if (res.success && res.data) {
+            setAssignments(res.data)
+        }
+        setLoading(false)
+    }
+
+    async function loadAssignmentResources(assignmentId: string) {
+        setLoadingResources(true)
+        setResourceError(null)
+        const res = await getAssignmentResources(assignmentId)
+        if (res.success && res.data) {
+            setAssignmentResources(res.data)
+        } else {
+            setResourceError(res.error || 'Error al cargar recursos del TP')
+        }
+        setLoadingResources(false)
+    }
+
+    async function handleProcessAssignmentImport() {
+        if (!importAssignmentText.trim()) return
+        setProcessingAssignmentImport(true)
+        setResourceError(null)
+        
+        const res = await extractAssignmentFromText(importAssignmentText)
+        if (res.success && res.data) {
+            setProposedAssignment(res.data)
+        } else {
+            setResourceError(res.error || 'Error al procesar el texto')
+        }
+        setProcessingAssignmentImport(false)
+    }
+
+    async function handleConfirmAssignmentImport() {
+        if (!proposedAssignment || !selectedCourse) return
+        setProcessingAssignmentImport(true)
+        
+        try {
+            // 1. Create Assignment
+            const assignRes = await createAssignment(
+                selectedCourse, 
+                proposedAssignment.title, 
+                proposedAssignment.description || '', 
+                proposedAssignment.due_date
+            )
+
+            if (!assignRes.success || !assignRes.data) {
+                throw new Error(assignRes.error || 'Error al crear el TP')
+            }
+
+            const newAssignmentId = assignRes.data.id
+
+            // 2. Add resources
+            let errorCount = 0
+            if (proposedAssignment.resources && proposedAssignment.resources.length > 0) {
+                for (const resource of proposedAssignment.resources) {
+                    const res = await createAssignmentResource(newAssignmentId, resource.title, resource.url, resource.type)
+                    if (!res.success) errorCount++
+                }
+            }
+
+            setProcessingAssignmentImport(false)
+            setIsImportingAssignment(false)
+            setProposedAssignment(null)
+            setImportAssignmentText('')
+            loadAssignments(selectedCourse)
+            
+            if (errorCount > 0) {
+                alert(`El TP se creó pero hubo ${errorCount} errores al añadir recursos.`)
+            }
+
+        } catch (error: any) {
+            setResourceError(error.message)
+            setProcessingAssignmentImport(false)
+        }
+    }
+
+    async function handleDeleteAssignment(assignmentId: string) {
+        if (!confirm('¿Estás seguro de eliminar este TP?')) return
+
+        const res = await deleteAssignment(assignmentId, selectedCourse)
+        if (res.success) {
+            loadAssignments(selectedCourse)
+            if (selectedAssignmentId === assignmentId) {
+                setSelectedAssignmentId(null)
+            }
+        } else {
+            alert(res.error || 'Error al eliminar TP')
+        }
+    }
+
+    async function handleDeleteAssignmentResource(resourceId: string) {
+        if (!confirm('¿Estás seguro de eliminar este recurso?')) return
+
+        const res = await deleteAssignmentResource(resourceId)
+        if (res.success && selectedAssignmentId) {
+            loadAssignmentResources(selectedAssignmentId)
+        } else {
+            alert(res.error || 'Error al eliminar recurso')
+        }
+    }
 
     useEffect(() => {
         if (selectedClassId) {
@@ -230,6 +360,14 @@ export default function ImportDashboard() {
             if (res.success) {
                 setIsResourceModalOpen(false)
                 loadResources(selectedClassId)
+                
+                // Update class list to refresh resource count
+                if (selectedCourse) {
+                    const classesRes = await getClasses(selectedCourse)
+                    if (classesRes.success && classesRes.data) {
+                        setClasses(classesRes.data)
+                    }
+                }
             } else {
                 setResourceError(res.error || 'Error al guardar recurso')
             }
@@ -247,6 +385,14 @@ export default function ImportDashboard() {
         const res = await deleteResource(resourceId)
         if (res.success && selectedClassId) {
             loadResources(selectedClassId)
+            
+            // Update class list to refresh resource count
+            if (selectedCourse) {
+                const classesRes = await getClasses(selectedCourse)
+                if (classesRes.success && classesRes.data) {
+                    setClasses(classesRes.data)
+                }
+            }
         } else {
             alert(res.error || 'Error al eliminar recurso')
         }
@@ -282,6 +428,14 @@ export default function ImportDashboard() {
         setImportText('')
         loadResources(selectedClassId)
         
+        // Update class list to refresh resource count
+        if (selectedCourse) {
+            const classesRes = await getClasses(selectedCourse)
+            if (classesRes.success && classesRes.data) {
+                setClasses(classesRes.data)
+            }
+        }
+        
         if (errorCount > 0) {
             alert(`Se importaron los recursos con ${errorCount} errores.`)
         }
@@ -311,6 +465,16 @@ export default function ImportDashboard() {
                     }`}
                 >
                     Clases
+                </button>
+                <button
+                    onClick={() => setActiveTab('assignments')}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                        activeTab === 'assignments'
+                            ? 'border-indigo-500 text-indigo-400'
+                            : 'border-transparent text-gray-400 hover:text-gray-200'
+                    }`}
+                >
+                    Trabajos Prácticos
                 </button>
                 <button
                     onClick={() => setActiveTab('users')}
@@ -783,6 +947,270 @@ export default function ImportDashboard() {
                                 </form>
                              </div>
                          )}
+                    </div>
+                )}
+
+                {activeTab === 'assignments' && (
+                    <div className="flex flex-col gap-6">
+                         <h3 className="text-lg font-medium text-gray-200">Gestión de Trabajos Prácticos</h3>
+                         
+                         {/* Selectors */}
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                             <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-2">Institución</label>
+                                <select 
+                                    className="w-full bg-neutral-800 border border-neutral-700 rounded p-2 text-gray-200 focus:outline-none focus:border-indigo-500"
+                                    value={selectedInstitution}
+                                    onChange={(e) => handleInstitutionChange(e.target.value)}
+                                    disabled={loading}
+                                >
+                                    <option value="">Seleccionar Institución</option>
+                                    {institutions.map(inst => (
+                                        <option key={inst.id} value={inst.id}>{inst.nombre}</option>
+                                    ))}
+                                </select>
+                             </div>
+                             
+                             <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-2">Curso</label>
+                                <select 
+                                    className="w-full bg-neutral-800 border border-neutral-700 rounded p-2 text-gray-200 focus:outline-none focus:border-indigo-500"
+                                    value={selectedCourse}
+                                    onChange={(e) => handleCourseChange(e.target.value)}
+                                    disabled={!selectedInstitution || loading}
+                                >
+                                    <option value="">Seleccionar Curso</option>
+                                    {courses.map(course => (
+                                        <option key={course.id} value={course.id}>
+                                            {course.name} 
+                                            {(course.start_date || course.end_date) && ` (${formatDateForDisplay(course.start_date, 'dd/MM/yyyy') || '?'} - ${formatDateForDisplay(course.end_date, 'dd/MM/yyyy') || '?'})`}
+                                        </option>
+                                    ))}
+                                </select>
+                             </div>
+                         </div>
+
+                        {selectedCourse && (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                {/* Assignments List */}
+                                <div className="bg-neutral-800 rounded border border-neutral-700 overflow-hidden">
+                                    <div className="p-4 border-b border-neutral-700 bg-neutral-800/50 flex justify-between items-center">
+                                       <h4 className="font-medium text-gray-300">TPs Existentes ({assignments.length})</h4>
+                                       {loading && <span className="text-xs text-indigo-400">Cargando...</span>}
+                                    </div>
+                                    <div className="max-h-96 overflow-y-auto">
+                                       {assignments.length === 0 ? (
+                                           <div className="p-4 text-gray-500 text-center text-sm">No hay trabajos prácticos registrados.</div>
+                                       ) : (
+                                           <table className="w-full text-sm text-left">
+                                               <thead className="text-xs text-gray-400 uppercase bg-neutral-900/50 sticky top-0">
+                                                   <tr>
+                                                       <th className="px-4 py-3">Título</th>
+                                                       <th className="px-4 py-3 text-right">Acciones</th>
+                                                   </tr>
+                                               </thead>
+                                               <tbody className="divide-y divide-neutral-700">
+                                                   {assignments.map(assign => (
+                                                       <tr 
+                                                           key={assign.id} 
+                                                           className={`hover:bg-neutral-700/50 cursor-pointer ${selectedAssignmentId === assign.id ? 'bg-neutral-700/50' : ''}`}
+                                                           onClick={() => setSelectedAssignmentId(assign.id)}
+                                                       >
+                                                           <td className="px-4 py-3">
+                                                               <div className="font-medium text-gray-200">{assign.title}</div>
+                                                               <div className="text-xs text-gray-400">Vence: {formatDateForDisplay(assign.due_date, 'dd/MM/yyyy HH:mm')}</div>
+                                                           </td>
+                                                           <td className="px-4 py-3 text-right">
+                                                               <button 
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        handleDeleteAssignment(assign.id)
+                                                                    }}
+                                                                    className="text-red-400 hover:text-red-300 text-xs font-medium"
+                                                               >
+                                                                   Eliminar
+                                                               </button>
+                                                           </td>
+                                                       </tr>
+                                                   ))}
+                                               </tbody>
+                                           </table>
+                                       )}
+                                    </div>
+                                </div>
+
+                                {/* Import/Details Panel */}
+                                <div className="bg-neutral-800 rounded border border-neutral-700 overflow-hidden flex flex-col">
+                                    <div className="p-4 border-b border-neutral-700 bg-neutral-800/50 flex justify-between items-center">
+                                        <h4 className="font-medium text-gray-300">
+                                            {selectedAssignmentId 
+                                                ? `Recursos: ${assignments.find(a => a.id === selectedAssignmentId)?.title}`
+                                                : 'Importar / Crear TP'}
+                                        </h4>
+                                        <div className="flex gap-2">
+                                            {!selectedAssignmentId && (
+                                                <button
+                                                    onClick={() => setIsImportingAssignment(!isImportingAssignment)}
+                                                    className={`px-3 py-1 rounded text-xs transition-colors border ${
+                                                        isImportingAssignment 
+                                                            ? 'border-indigo-500 text-indigo-400 bg-indigo-500/10' 
+                                                            : 'border-neutral-600 text-gray-400 hover:border-gray-400'
+                                                    }`}
+                                                >
+                                                    {isImportingAssignment ? 'Cancelar Importación' : 'Importar con IA'}
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="p-4 flex-1 overflow-y-auto min-h-[300px]">
+                                        {selectedAssignmentId ? (
+                                            /* Resources List for Selected Assignment */
+                                            <div className="flex flex-col gap-3">
+                                                {loadingResources ? (
+                                                    <div className="text-center py-8 text-gray-500">Cargando recursos...</div>
+                                                ) : assignmentResources.length === 0 ? (
+                                                    <div className="text-center py-8 text-gray-500">No hay recursos asociados a este TP.</div>
+                                                ) : (
+                                                    assignmentResources.map(res => (
+                                                        <div key={res.id} className="flex items-center justify-between p-3 bg-neutral-900/50 rounded border border-neutral-700 group hover:border-neutral-600 transition-colors">
+                                                            <div className="flex items-center gap-3 overflow-hidden">
+                                                                <span className={`text-[10px] px-1.5 py-0.5 rounded border uppercase tracking-wider ${
+                                                                    res.type === 'video' ? 'border-red-500/30 text-red-400 bg-red-500/10' :
+                                                                    res.type === 'file' ? 'border-blue-500/30 text-blue-400 bg-blue-500/10' :
+                                                                    'border-green-500/30 text-green-400 bg-green-500/10'
+                                                                }`}>
+                                                                    {resourceTypeLabels[res.type] || res.type}
+                                                                </span>
+                                                                <div className="flex flex-col overflow-hidden">
+                                                                    <span className="text-sm text-gray-200 truncate font-medium" title={res.title}>{res.title}</span>
+                                                                    <a href={res.url} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-500 truncate hover:text-indigo-400 transition-colors">{res.url}</a>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <button 
+                                                                    onClick={() => handleDeleteAssignmentResource(res.id)}
+                                                                    className="p-1.5 text-red-400 hover:bg-red-500/10 rounded"
+                                                                    title="Eliminar"
+                                                                >
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                )}
+                                                <button 
+                                                    onClick={() => setSelectedAssignmentId(null)}
+                                                    className="mt-4 text-sm text-indigo-400 hover:text-indigo-300 self-center"
+                                                >
+                                                    ← Volver a crear TP
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            /* Import / Create Form */
+                                            isImportingAssignment ? (
+                                                <div className="flex flex-col gap-4 h-full">
+                                                    {!proposedAssignment ? (
+                                                        <>
+                                                            <div className="text-sm text-gray-400">
+                                                                Pega el texto con la información del trabajo práctico para procesar con IA:
+                                                            </div>
+                                                            <textarea
+                                                                className="flex-1 bg-neutral-900 border border-neutral-700 rounded p-3 text-sm text-gray-200 focus:outline-none focus:border-indigo-500 resize-none font-mono"
+                                                                placeholder={`Trabajo Práctico 1...\nFecha límite: ...\nEnunciado: https://...\nFormulario: https://...`}
+                                                                value={importAssignmentText}
+                                                                onChange={(e) => setImportAssignmentText(e.target.value)}
+                                                            ></textarea>
+                                                            <button
+                                                                onClick={handleProcessAssignmentImport}
+                                                                disabled={processingAssignmentImport || !importAssignmentText.trim()}
+                                                                className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-600/50 disabled:cursor-not-allowed text-white py-2 rounded font-medium transition-colors flex justify-center items-center gap-2"
+                                                            >
+                                                                {processingAssignmentImport ? (
+                                                                    <>
+                                                                        <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                                        </svg>
+                                                                        Procesando...
+                                                                    </>
+                                                                ) : 'Procesar con IA'}
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <div className="flex flex-col gap-4 h-full overflow-y-auto">
+                                                            <div className="flex justify-between items-center">
+                                                                <h5 className="font-medium text-gray-200">Resultado del Análisis</h5>
+                                                                <button onClick={() => setProposedAssignment(null)} className="text-xs text-gray-400 hover:text-white">Reintentar</button>
+                                                            </div>
+                                                            
+                                                            <div className="space-y-3">
+                                                                <div>
+                                                                    <label className="text-xs text-gray-500 uppercase">Título</label>
+                                                                    <input 
+                                                                        type="text" 
+                                                                        value={proposedAssignment.title} 
+                                                                        onChange={(e) => setProposedAssignment({...proposedAssignment, title: e.target.value})}
+                                                                        className="w-full bg-neutral-900 border border-neutral-700 rounded p-2 text-sm text-gray-200"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="text-xs text-gray-500 uppercase">Vencimiento</label>
+                                                                    <input 
+                                                                        type="datetime-local" 
+                                                                        value={proposedAssignment.due_date ? proposedAssignment.due_date.slice(0, 16) : ''} 
+                                                                        onChange={(e) => setProposedAssignment({...proposedAssignment, due_date: e.target.value})}
+                                                                        className="w-full bg-neutral-900 border border-neutral-700 rounded p-2 text-sm text-gray-200"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="text-xs text-gray-500 uppercase">Recursos Detectados ({proposedAssignment.resources?.length || 0})</label>
+                                                                    <div className="space-y-2 mt-1 max-h-40 overflow-y-auto">
+                                                                        {proposedAssignment.resources?.map((res: any, idx: number) => (
+                                                                            <div key={idx} className="flex gap-2 items-start text-xs bg-neutral-900 p-2 rounded border border-neutral-800">
+                                                                                <span className="uppercase text-indigo-400 shrink-0">{res.type}</span>
+                                                                                <div className="flex-1 min-w-0">
+                                                                                    <div className="truncate text-gray-300">{res.title}</div>
+                                                                                    <div className="truncate text-gray-500">{res.url}</div>
+                                                                                </div>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="mt-auto pt-4 flex gap-2">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setProposedAssignment(null)
+                                                                        setIsImportingAssignment(false)
+                                                                    }}
+                                                                    className="flex-1 border border-neutral-700 hover:bg-neutral-800 text-gray-300 py-2 rounded text-sm transition-colors"
+                                                                >
+                                                                    Cancelar
+                                                                </button>
+                                                                <button
+                                                                    onClick={handleConfirmAssignmentImport}
+                                                                    disabled={processingAssignmentImport}
+                                                                    className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded text-sm font-medium transition-colors"
+                                                                >
+                                                                    {processingAssignmentImport ? 'Guardando...' : 'Confirmar Importación'}
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <div className="flex flex-col items-center justify-center h-full text-gray-500 gap-2">
+                                                    <p>Selecciona "Importar con IA" para crear un nuevo TP desde texto.</p>
+                                                    <p className="text-xs opacity-60">(O selecciona un TP existente para ver sus recursos)</p>
+                                                </div>
+                                            )
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
                 

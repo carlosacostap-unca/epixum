@@ -52,3 +52,56 @@ export async function extractResourcesFromText(text: string) {
         return { success: false, error: error.message || 'Error al procesar el texto con IA' }
     }
 }
+
+export async function extractAssignmentFromText(text: string) {
+    if (!process.env.OPENAI_API_KEY) {
+        return { success: false, error: 'OpenAI API Key no configurada' }
+    }
+
+    const openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+    })
+
+    try {
+        const completion = await openai.chat.completions.create({
+            model: "gpt-5-mini",
+            messages: [
+                {
+                    role: "system",
+                    content: `Eres un asistente útil que extrae información de trabajos prácticos de textos no estructurados.
+                    Debes devolver un JSON válido con la siguiente estructura:
+                    {
+                        "title": "Título del TP",
+                        "description": "Descripción breve o contenido principal",
+                        "due_date": "YYYY-MM-DDTHH:mm:ss" (ISO 8601, inferir año actual si falta),
+                        "resources": [
+                            { "title": "...", "url": "...", "type": "link|video|file" }
+                        ]
+                    }
+
+                    Reglas:
+                    - Extrae la fecha límite y conviértela a formato ISO.
+                    - Extrae todos los enlaces como recursos (enunciado, formularios, planillas).
+                    - Si hay múltiples formularios, inclúyelos como recursos separados.`
+                },
+                {
+                    role: "user",
+                    content: text
+                }
+            ],
+            response_format: { type: "json_object" }
+        })
+
+        const content = completion.choices[0].message.content
+        if (!content) {
+            throw new Error("No se recibió respuesta del modelo")
+        }
+
+        const result = JSON.parse(content)
+        return { success: true, data: result }
+
+    } catch (error: any) {
+        console.error('Error extracting assignment:', error)
+        return { success: false, error: error.message || 'Error al procesar el texto con IA' }
+    }
+}

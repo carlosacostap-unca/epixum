@@ -401,7 +401,10 @@ export default function AssignmentManagement({ courseId, initialAssignments, spr
                             )}
 
                             {expandedAssignmentId === item.id && (
-                                <SubmissionList assignmentId={item.id} />
+                                <SubmissionList 
+                                    assignmentId={item.id} 
+                                    courseId={courseId}
+                                />
                             )}
                         </div>
                     )})
