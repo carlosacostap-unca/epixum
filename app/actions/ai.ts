@@ -2,14 +2,14 @@
 
 import OpenAI from 'openai'
 
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-})
-
 export async function extractResourcesFromText(text: string) {
     if (!process.env.OPENAI_API_KEY) {
         return { success: false, error: 'OpenAI API Key no configurada' }
     }
+
+    const openai = new OpenAI({
+        apiKey: process.env.OPENAI_API_KEY,
+    })
 
     try {
         const completion = await openai.chat.completions.create({
