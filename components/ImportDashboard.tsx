@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { getInstitutions } from '@/app/actions/institutions'
-import { getCourses } from '@/app/actions/courses'
+import { getCourses, getCourseStudents } from '@/app/actions/courses'
 import { getClasses, createClass } from '@/app/actions/classes'
 import { getClassResources, createResource, updateResource, deleteResource, getSignedUploadUrl } from '@/app/actions/resources'
 import { getAssignments, createAssignment, deleteAssignment, getAssignmentResources, createAssignmentResource, deleteAssignmentResource } from '@/app/actions/assignments'
 import { extractResourcesFromText, extractAssignmentFromText } from '@/app/actions/ai'
+import CourseStudentManagement from './CourseStudentManagement'
 import Link from 'next/link'
 import { formatDateForDisplay } from '@/utils/date'
 
@@ -62,6 +63,9 @@ export default function ImportDashboard() {
     const [assignments, setAssignments] = useState<any[]>([])
     const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
     const [assignmentResources, setAssignmentResources] = useState<any[]>([])
+
+    // Students State
+    const [students, setStudents] = useState<any[]>([])
     
     // Import Assignment State
     const [isImportingAssignment, setIsImportingAssignment] = useState(false)
@@ -70,14 +74,20 @@ export default function ImportDashboard() {
     const [proposedAssignment, setProposedAssignment] = useState<any | null>(null)
 
     useEffect(() => {
-        if (activeTab === 'classes') {
+        if (activeTab === 'classes' || activeTab === 'students' || activeTab === 'assignments') {
             loadInstitutions()
         }
     }, [activeTab])
 
     useEffect(() => {
-        if (selectedCourse && activeTab === 'assignments') {
-            loadAssignments(selectedCourse)
+        if (selectedCourse) {
+            if (activeTab === 'assignments') {
+                loadAssignments(selectedCourse)
+            } else if (activeTab === 'students') {
+                loadStudents(selectedCourse)
+            } else if (activeTab === 'classes') {
+                loadClasses(selectedCourse)
+            }
         }
     }, [activeTab, selectedCourse])
 
@@ -88,6 +98,15 @@ export default function ImportDashboard() {
             setAssignmentResources([])
         }
     }, [selectedAssignmentId])
+
+    async function loadStudents(courseId: string) {
+        setLoading(true)
+        const res = await getCourseStudents(courseId)
+        if (res.success && res.data) {
+            setStudents(res.data)
+        }
+        setLoading(false)
+    }
 
     async function loadAssignments(courseId: string) {
         setLoading(true)
@@ -226,8 +245,11 @@ export default function ImportDashboard() {
         setSelectedInstitution(instId)
         setSelectedCourse('')
         setClasses([])
+        setAssignments([])
+        setStudents([])
         setCourses([])
         setSelectedClassId(null)
+        setSelectedAssignmentId(null)
         
         if (instId) {
             setLoading(true)
@@ -242,17 +264,20 @@ export default function ImportDashboard() {
     async function handleCourseChange(courseId: string) {
         setSelectedCourse(courseId)
         setClasses([])
+        setAssignments([])
+        setStudents([])
         setCreateError(null)
         setSelectedClassId(null)
-        
-        if (courseId) {
-            setLoading(true)
-            const res = await getClasses(courseId)
-            if (res.success && res.data) {
-                setClasses(res.data)
-            }
-            setLoading(false)
+        setSelectedAssignmentId(null)
+    }
+
+    async function loadClasses(courseId: string) {
+        setLoading(true)
+        const res = await getClasses(courseId)
+        if (res.success && res.data) {
+            setClasses(res.data)
         }
+        setLoading(false)
     }
 
     async function handleCreateClass(e: React.FormEvent) {
@@ -477,6 +502,16 @@ export default function ImportDashboard() {
                     Trabajos Prácticos
                 </button>
                 <button
+                    onClick={() => setActiveTab('students')}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                        activeTab === 'students'
+                            ? 'border-indigo-500 text-indigo-400'
+                            : 'border-transparent text-gray-400 hover:text-gray-200'
+                    }`}
+                >
+                    Estudiantes
+                </button>
+                <button
                     onClick={() => setActiveTab('users')}
                     className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                         activeTab === 'users'
@@ -499,6 +534,57 @@ export default function ImportDashboard() {
             </div>
 
             <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6">
+                {activeTab === 'students' && (
+                    <div className="flex flex-col gap-6">
+                         <h3 className="text-lg font-medium text-gray-200">Gestión de Estudiantes</h3>
+                         
+                         {/* Selectors */}
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                             <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-2">Institución</label>
+                                <select 
+                                    className="w-full bg-neutral-800 border border-neutral-700 rounded p-2 text-gray-200 focus:outline-none focus:border-indigo-500"
+                                    value={selectedInstitution}
+                                    onChange={(e) => handleInstitutionChange(e.target.value)}
+                                    disabled={loading}
+                                >
+                                    <option value="">Seleccionar Institución</option>
+                                    {institutions.map(inst => (
+                                        <option key={inst.id} value={inst.id}>{inst.nombre}</option>
+                                    ))}
+                                </select>
+                             </div>
+                             
+                             <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-2">Curso</label>
+                                <select 
+                                    className="w-full bg-neutral-800 border border-neutral-700 rounded p-2 text-gray-200 focus:outline-none focus:border-indigo-500"
+                                    value={selectedCourse}
+                                    onChange={(e) => handleCourseChange(e.target.value)}
+                                    disabled={!selectedInstitution || loading}
+                                >
+                                    <option value="">Seleccionar Curso</option>
+                                    {courses.map(course => (
+                                        <option key={course.id} value={course.id}>
+                                            {course.name} 
+                                            {(course.start_date || course.end_date) && ` (${formatDateForDisplay(course.start_date, 'dd/MM/yyyy') || '?'} - ${formatDateForDisplay(course.end_date, 'dd/MM/yyyy') || '?'})`}
+                                        </option>
+                                    ))}
+                                </select>
+                             </div>
+                         </div>
+
+                        {selectedCourse && (
+                            <CourseStudentManagement
+                                initialStudents={students}
+                                courseId={selectedCourse}
+                                institutionId={selectedInstitution}
+                                onUpdate={() => loadStudents(selectedCourse)}
+                            />
+                        )}
+                    </div>
+                )}
+                
                 {activeTab === 'users' && (
                     <div className="flex flex-col gap-4 items-center py-8">
                         <h3 className="text-lg font-medium text-gray-200">Gestión de Usuarios</h3>
