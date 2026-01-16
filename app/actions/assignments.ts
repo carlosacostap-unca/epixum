@@ -63,6 +63,45 @@ export async function getAssignments(courseId: string) {
     }
 }
 
+export async function getAllCourseSubmissions(courseId: string) {
+    try {
+        const { user } = await checkAuth()
+        const adminClient = getAdminClient()
+
+        // Verify teacher enrollment
+        const { data: teacherEnrollment } = await adminClient
+            .from('course_enrollments')
+            .select('id')
+            .eq('course_id', courseId)
+            .ilike('email', user.email!)
+            .eq('role', 'docente')
+            .single()
+
+        // Check if supervisor
+        const { data: profile } = await adminClient
+            .from('profiles')
+            .select('roles')
+            .eq('email', user.email!)
+            .single()
+        
+        const isSupervisor = profile?.roles?.includes('supervisor')
+
+        if (!teacherEnrollment && !isSupervisor) {
+            throw new Error('No tienes permisos para ver las entregas de este curso')
+        }
+
+        const { data, error } = await adminClient
+            .from('assignment_submissions')
+            .select('*, assignments!inner(course_id)')
+            .eq('assignments.course_id', courseId)
+
+        if (error) throw error
+        return { success: true, data }
+    } catch (error: unknown) {
+        return { success: false, error: (error as Error).message }
+    }
+}
+
 export async function getStudentAssignments(courseId: string) {
     try {
         const { user, supabase } = await checkAuth()
@@ -100,6 +139,77 @@ export async function getStudentAssignments(courseId: string) {
 
         if (error) throw error
         return { success: true, data }
+    } catch (error: unknown) {
+        return { success: false, error: (error as Error).message }
+    }
+}
+
+export async function setStudentGrade(assignmentId: string, studentEmail: string, grade: string) {
+    try {
+        const { user } = await checkAuth()
+        const adminClient = getAdminClient()
+
+        // Get assignment to check course
+        const { data: assignment } = await adminClient
+            .from('assignments')
+            .select('course_id')
+            .eq('id', assignmentId)
+            .single()
+
+        if (!assignment) throw new Error('Trabajo práctico no encontrado')
+
+        // Verify teacher enrollment
+        const { data: teacherEnrollment } = await adminClient
+            .from('course_enrollments')
+            .select('id')
+            .eq('course_id', assignment.course_id)
+            .ilike('email', user.email!)
+            .eq('role', 'docente')
+            .single()
+
+        // Check if supervisor
+        const { data: profile } = await adminClient
+            .from('profiles')
+            .select('roles')
+            .eq('email', user.email!)
+            .single()
+        
+        const isSupervisor = profile?.roles?.includes('supervisor')
+
+        if (!teacherEnrollment && !isSupervisor) {
+            throw new Error('No tienes permisos de docente en este curso')
+        }
+
+        // Check if submission exists
+        const { data: existing } = await adminClient
+            .from('assignment_submissions')
+            .select('id')
+            .eq('assignment_id', assignmentId)
+            .ilike('student_email', studentEmail)
+            .single()
+            
+        if (existing) {
+             const { error } = await adminClient
+                .from('assignment_submissions')
+                .update({ grade })
+                .eq('id', existing.id)
+             if (error) throw error
+        } else {
+             // Create new submission
+             const { error } = await adminClient
+                .from('assignment_submissions')
+                .insert({
+                    assignment_id: assignmentId,
+                    student_email: studentEmail,
+                    grade,
+                    content: '',
+                    file_url: ''
+                })
+             if (error) throw error
+        }
+        
+        revalidatePath(`/teacher/courses/${assignment.course_id}`)
+        return { success: true }
     } catch (error: unknown) {
         return { success: false, error: (error as Error).message }
     }
@@ -283,6 +393,99 @@ export async function updateSubmissionGrade(submissionId: string, grade: string)
         if (error) throw error
         
         return { success: true }
+    } catch (error: unknown) {
+        return { success: false, error: (error as Error).message }
+    }
+}
+
+export async function bulkUpdateGrades(courseId: string, updates: { assignmentId: string, studentEmail: string, grade: string }[]) {
+    try {
+        const { user } = await checkAuth()
+        const adminClient = getAdminClient()
+
+        // Verify teacher enrollment
+        const { data: teacherEnrollment } = await adminClient
+            .from('course_enrollments')
+            .select('id')
+            .eq('course_id', courseId)
+            .ilike('email', user.email!)
+            .eq('role', 'docente')
+            .single()
+
+        // Check if supervisor
+        const { data: profile } = await adminClient
+            .from('profiles')
+            .select('roles')
+            .eq('email', user.email!)
+            .single()
+        
+        const isSupervisor = profile?.roles?.includes('supervisor')
+
+        if (!teacherEnrollment && !isSupervisor) {
+            throw new Error('No tienes permisos para calificar en este curso')
+        }
+
+        // Get valid assignments for this course
+        const { data: validAssignments } = await adminClient
+            .from('assignments')
+            .select('id')
+            .eq('course_id', courseId)
+        
+        const validAssignmentIds = new Set(validAssignments?.map(a => a.id))
+
+        // Filter updates for valid assignments
+        const validUpdates = updates.filter(u => validAssignmentIds.has(u.assignmentId))
+
+        if (validUpdates.length === 0) {
+            return { success: true, message: 'No updates to apply' }
+        }
+
+        // Fetch existing submissions
+        const { data: existingSubmissions, error: fetchError } = await adminClient
+             .from('assignment_submissions')
+             .select('id, assignment_id, student_email, assignments!inner(course_id)')
+             .eq('assignments.course_id', courseId)
+        
+        if (fetchError) throw fetchError
+
+        const existingMap = new Map<string, string>(); 
+        existingSubmissions?.forEach(sub => {
+            if (sub.student_email) {
+                existingMap.set(`${sub.assignment_id}-${sub.student_email.toLowerCase()}`, sub.id)
+            }
+        })
+
+        const promises = validUpdates.map(async (update) => {
+            const key = `${update.assignmentId}-${update.studentEmail.toLowerCase()}`
+            const existingId = existingMap.get(key)
+
+            if (existingId) {
+                return adminClient
+                    .from('assignment_submissions')
+                    .update({ grade: update.grade })
+                    .eq('id', existingId)
+            } else {
+                return adminClient
+                    .from('assignment_submissions')
+                    .insert({
+                        assignment_id: update.assignmentId,
+                        student_email: update.studentEmail,
+                        grade: update.grade,
+                        content: '',
+                        file_url: ''
+                    })
+            }
+        })
+
+        // Execute in batches
+        const BATCH_SIZE = 10;
+        for (let i = 0; i < promises.length; i += BATCH_SIZE) {
+            await Promise.all(promises.slice(i, i + BATCH_SIZE));
+        }
+
+        revalidatePath(`/teacher/courses/${courseId}`)
+        return { success: true }
+
     } catch (error: unknown) {
         return { success: false, error: (error as Error).message }
     }

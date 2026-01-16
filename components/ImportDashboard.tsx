@@ -5,7 +5,7 @@ import { getInstitutions } from '@/app/actions/institutions'
 import { getCourses, getCourseStudents } from '@/app/actions/courses'
 import { getClasses, createClass } from '@/app/actions/classes'
 import { getClassResources, createResource, updateResource, deleteResource, getSignedUploadUrl } from '@/app/actions/resources'
-import { getAssignments, createAssignment, deleteAssignment, getAssignmentResources, createAssignmentResource, deleteAssignmentResource } from '@/app/actions/assignments'
+import { getAssignments, createAssignment, deleteAssignment, getAssignmentResources, createAssignmentResource, deleteAssignmentResource, getAllCourseSubmissions, setStudentGrade, bulkUpdateGrades } from '@/app/actions/assignments'
 import { extractResourcesFromText, extractAssignmentFromText } from '@/app/actions/ai'
 import CourseStudentManagement from './CourseStudentManagement'
 import Link from 'next/link'
@@ -73,8 +73,16 @@ export default function ImportDashboard() {
     const [processingAssignmentImport, setProcessingAssignmentImport] = useState(false)
     const [proposedAssignment, setProposedAssignment] = useState<any | null>(null)
 
+    // Evaluations State
+    const [submissions, setSubmissions] = useState<any[]>([])
+    const [loadingSubmissions, setLoadingSubmissions] = useState(false)
+    const [isImportingGrades, setIsImportingGrades] = useState(false)
+    const [importGradesText, setImportGradesText] = useState('')
+    const [processingGradesImport, setProcessingGradesImport] = useState(false)
+    const [importGradesError, setImportGradesError] = useState<string | null>(null)
+
     useEffect(() => {
-        if (activeTab === 'classes' || activeTab === 'students' || activeTab === 'assignments') {
+        if (activeTab === 'classes' || activeTab === 'students' || activeTab === 'assignments' || activeTab === 'evaluations') {
             loadInstitutions()
         }
     }, [activeTab])
@@ -87,6 +95,10 @@ export default function ImportDashboard() {
                 loadStudents(selectedCourse)
             } else if (activeTab === 'classes') {
                 loadClasses(selectedCourse)
+            } else if (activeTab === 'evaluations') {
+                loadStudents(selectedCourse)
+                loadAssignments(selectedCourse)
+                loadSubmissions(selectedCourse)
             }
         }
     }, [activeTab, selectedCourse])
@@ -127,6 +139,111 @@ export default function ImportDashboard() {
             setResourceError(res.error || 'Error al cargar recursos del TP')
         }
         setLoadingResources(false)
+    }
+
+    async function loadSubmissions(courseId: string) {
+        setLoadingSubmissions(true)
+        const res = await getAllCourseSubmissions(courseId)
+        if (res.success && res.data) {
+            setSubmissions(res.data)
+        }
+        setLoadingSubmissions(false)
+    }
+
+    async function handleGradeChange(assignmentId: string, studentEmail: string, grade: string) {
+        // Optimistic update
+        const updatedSubmissions = [...submissions]
+        const existingIndex = updatedSubmissions.findIndex(s => 
+            s.assignment_id === assignmentId && 
+            s.student_email?.toLowerCase() === studentEmail.toLowerCase()
+        )
+
+        if (existingIndex >= 0) {
+            updatedSubmissions[existingIndex] = { ...updatedSubmissions[existingIndex], grade }
+        } else {
+            updatedSubmissions.push({
+                assignment_id: assignmentId,
+                student_email: studentEmail,
+                grade
+            })
+        }
+        setSubmissions(updatedSubmissions)
+    }
+
+    async function handleSaveGrade(assignmentId: string, studentEmail: string, grade: string) {
+        // API Call
+        const res = await setStudentGrade(assignmentId, studentEmail, grade)
+        if (!res.success) {
+            alert(res.error || 'Error al calificar')
+            // Revert on error
+            loadSubmissions(selectedCourse)
+        }
+    }
+
+    async function handleBulkEvaluationImport() {
+        if (!importGradesText.trim() || !selectedCourse) return
+        setProcessingGradesImport(true)
+        setImportGradesError(null)
+
+        try {
+            const lines = importGradesText.trim().split('\n')
+            const updates: { assignmentId: string, studentEmail: string, grade: string }[] = []
+            
+            // Assume assignments are sorted by due_date (as loaded by getAssignments)
+            // This matches the columns in the text
+            
+            lines.forEach(line => {
+                // Determine separator: try tab first, then comma
+                let parts = line.split('\t').map(p => p.trim())
+                
+                // If single part and line has commas, try splitting by comma
+                if (parts.length === 1 && line.includes(',')) {
+                    parts = line.split(',').map(p => p.trim())
+                }
+
+                const email = parts[0]
+                
+                // Validate email (simple check)
+                if (!email || !email.includes('@')) return
+
+                // Iterate over grades
+                for (let i = 1; i < parts.length; i++) {
+                    const grade = parts[i]
+                    if (grade && (grade === 'Aprobado' || grade === 'Corregir y reenviar')) {
+                        const assignmentIndex = i - 1
+                        if (assignmentIndex < assignments.length) {
+                            updates.push({
+                                assignmentId: assignments[assignmentIndex].id,
+                                studentEmail: email,
+                                grade
+                            })
+                        }
+                    }
+                }
+            })
+
+            if (updates.length === 0) {
+                setImportGradesError('No se encontraron calificaciones válidas para importar. Asegúrate de usar el formato correcto (Email [separador] Nota1 [separador] Nota2...). Las notas deben ser "Aprobado" o "Corregir y reenviar".')
+                setProcessingGradesImport(false)
+                return
+            }
+
+            const res = await bulkUpdateGrades(selectedCourse, updates)
+            
+            if (res.success) {
+                setImportGradesText('')
+                setIsImportingGrades(false)
+                loadSubmissions(selectedCourse)
+                alert(`Se importaron ${updates.length} calificaciones correctamente.`)
+            } else {
+                setImportGradesError(res.error || 'Error al importar calificaciones')
+            }
+
+        } catch (error: any) {
+            setImportGradesError(error.message || 'Error inesperado')
+        } finally {
+            setProcessingGradesImport(false)
+        }
     }
 
     async function handleProcessAssignmentImport() {
@@ -502,6 +619,16 @@ export default function ImportDashboard() {
                     Trabajos Prácticos
                 </button>
                 <button
+                    onClick={() => setActiveTab('evaluations')}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                        activeTab === 'evaluations'
+                            ? 'border-indigo-500 text-indigo-400'
+                            : 'border-transparent text-gray-400 hover:text-gray-200'
+                    }`}
+                >
+                    Evaluaciones
+                </button>
+                <button
                     onClick={() => setActiveTab('students')}
                     className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
                         activeTab === 'students'
@@ -582,6 +709,7 @@ export default function ImportDashboard() {
                                 onUpdate={() => loadStudents(selectedCourse)}
                             />
                         )}
+                        {/* Modal removed from Students tab */}
                     </div>
                 )}
                 
@@ -875,10 +1003,12 @@ export default function ImportDashboard() {
                                                 </div>
                                             )}
                                         </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                             </div>
+                         )}
+
+                        {/* Modal moved to Evaluations tab */}
+                     </div>
+                 )}
 
                         {/* Resource Modal */}
                         {isResourceModalOpen && (
@@ -1293,6 +1423,180 @@ export default function ImportDashboard() {
                                                 </div>
                                             )
                                         )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {activeTab === 'evaluations' && (
+                    <div className="flex flex-col gap-6">
+                         <div className="flex justify-between items-center">
+                            <h3 className="text-lg font-medium text-gray-200">Gestión de Evaluaciones</h3>
+                            {selectedCourse && (
+                                <button
+                                    onClick={() => setIsImportingGrades(true)}
+                                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-sm transition-colors"
+                                >
+                                    Importar Calificaciones
+                                </button>
+                            )}
+                         </div>
+                         
+                         {/* Selectors */}
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                             <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-2">Institución</label>
+                                <select 
+                                    className="w-full bg-neutral-800 border border-neutral-700 rounded p-2 text-gray-200 focus:outline-none focus:border-indigo-500"
+                                    value={selectedInstitution}
+                                    onChange={(e) => handleInstitutionChange(e.target.value)}
+                                    disabled={loading}
+                                >
+                                    <option value="">Seleccionar Institución</option>
+                                    {institutions.map(inst => (
+                                        <option key={inst.id} value={inst.id}>{inst.nombre}</option>
+                                    ))}
+                                </select>
+                             </div>
+                             
+                             <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-2">Curso</label>
+                                <select 
+                                    className="w-full bg-neutral-800 border border-neutral-700 rounded p-2 text-gray-200 focus:outline-none focus:border-indigo-500"
+                                    value={selectedCourse}
+                                    onChange={(e) => handleCourseChange(e.target.value)}
+                                    disabled={!selectedInstitution || loading}
+                                >
+                                    <option value="">Seleccionar Curso</option>
+                                    {courses.map(course => (
+                                        <option key={course.id} value={course.id}>
+                                            {course.name} 
+                                            {(course.start_date || course.end_date) && ` (${formatDateForDisplay(course.start_date, 'dd/MM/yyyy') || '?'} - ${formatDateForDisplay(course.end_date, 'dd/MM/yyyy') || '?'})`}
+                                        </option>
+                                    ))}
+                                </select>
+                             </div>
+                         </div>
+
+                        {selectedCourse && (
+                            <div className="bg-neutral-800 rounded border border-neutral-700 overflow-hidden">
+                                <div className="p-4 border-b border-neutral-700 bg-neutral-800/50 flex justify-between items-center">
+                                   <h4 className="font-medium text-gray-300">Planilla de Calificaciones</h4>
+                                   {loadingSubmissions && <span className="text-xs text-indigo-400">Cargando notas...</span>}
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm text-left border-collapse">
+                                        <thead className="text-xs text-gray-400 uppercase bg-neutral-900/50 sticky top-0 z-10">
+                                            <tr>
+                                                <th className="px-4 py-3 sticky left-0 bg-neutral-900 border-r border-neutral-700 min-w-[200px]">Estudiante</th>
+                                                {assignments.map(assign => (
+                                                    <th key={assign.id} className="px-4 py-3 min-w-[120px] text-center border-r border-neutral-700/50">
+                                                        <div className="truncate max-w-[150px]" title={assign.title}>{assign.title}</div>
+                                                        <div className="text-[10px] normal-case opacity-60">{formatDateForDisplay(assign.due_date, 'dd/MM')}</div>
+                                                    </th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-neutral-700">
+                                            {[...students].sort((a, b) => {
+                                                const nameA = a.last_name && a.first_name 
+                                                    ? `${a.last_name}, ${a.first_name}` 
+                                                    : a.email
+                                                const nameB = b.last_name && b.first_name 
+                                                    ? `${b.last_name}, ${b.first_name}` 
+                                                    : b.email
+                                                return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' })
+                                            }).map(student => {
+                                                const studentName = student.last_name && student.first_name 
+                                                    ? `${student.last_name}, ${student.first_name}` 
+                                                    : student.email
+                                                
+                                                return (
+                                                    <tr key={student.email} className="hover:bg-neutral-700/30">
+                                                        <td className="px-4 py-2 sticky left-0 bg-neutral-800 border-r border-neutral-700 font-medium text-gray-300">
+                                                            <div className="truncate max-w-[200px]" title={studentName}>{studentName}</div>
+                                                            <div className="text-xs text-gray-500 truncate">{student.email}</div>
+                                                        </td>
+                                                        {assignments.map(assign => {
+                                                            const submission = submissions.find(s => 
+                                                                s.assignment_id === assign.id && 
+                                                                s.student_email?.toLowerCase() === student.email.toLowerCase()
+                                                            )
+                                                            const grade = submission?.grade || ''
+                                                            
+                                                            return (
+                                                                <td key={`${student.email}-${assign.id}`} className="px-2 py-2 border-r border-neutral-700/50 text-center">
+                                                                    <input 
+                                                                        type="text" 
+                                                                        value={grade}
+                                                                        onChange={(e) => handleGradeChange(assign.id, student.email, e.target.value)}
+                                                                        onBlur={(e) => handleSaveGrade(assign.id, student.email, e.target.value)}
+                                                                        className={`w-full text-center bg-transparent border-b border-transparent focus:border-indigo-500 focus:outline-none transition-colors ${
+                                                                            grade ? 'text-gray-200' : 'text-gray-600'
+                                                                        }`}
+                                                                        placeholder="-"
+                                                                    />
+                                                                </td>
+                                                            )
+                                                        })}
+                                                    </tr>
+                                                )
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {isImportingGrades && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+                                <div className="bg-neutral-900 border border-neutral-700 rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto p-6">
+                                    <h3 className="text-xl font-bold text-white mb-4">Importar Calificaciones</h3>
+                                    
+                                    <div className="mb-4 text-sm text-gray-400">
+                                        <p>Pega el contenido de tu hoja de cálculo aquí.</p>
+                                        <p className="mt-1">Formato esperado: <code>Email [tab] Nota TP1 [tab] Nota TP2...</code></p>
+                                        <p className="mt-1">Las columnas de notas deben coincidir con el orden de los trabajos prácticos en el sistema.</p>
+                                        <p className="mt-1">Solo se importarán las notas: "Aprobado" y "Corregir y reenviar". Las celdas vacías se ignorarán.</p>
+                                    </div>
+
+                                    <textarea
+                                        value={importGradesText}
+                                        onChange={(e) => setImportGradesText(e.target.value)}
+                                        placeholder={`ejemplo@email.com\tAprobado\t\tCorregir y reenviar\notro@email.com\t\tAprobado`}
+                                        className="w-full h-64 bg-neutral-800 border border-neutral-700 rounded p-4 text-sm text-gray-300 font-mono focus:outline-none focus:border-indigo-500 mb-4"
+                                    />
+
+                                    {importGradesError && (
+                                        <div className="mb-4 p-3 bg-red-900/30 border border-red-800 text-red-200 rounded text-sm">
+                                            {importGradesError}
+                                        </div>
+                                    )}
+
+                                    <div className="flex justify-end gap-3">
+                                        <button
+                                            onClick={() => setIsImportingGrades(false)}
+                                            className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+                                            disabled={processingGradesImport}
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button
+                                            onClick={handleBulkEvaluationImport}
+                                            disabled={processingGradesImport || !importGradesText.trim()}
+                                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                        >
+                                            {processingGradesImport ? (
+                                                <>
+                                                    <span className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></span>
+                                                    Procesando...
+                                                </>
+                                            ) : (
+                                                'Importar'
+                                            )}
+                                        </button>
                                     </div>
                                 </div>
                             </div>
