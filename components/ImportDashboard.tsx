@@ -1360,6 +1360,12 @@ export default function ImportDashboard() {
                                                                 <button onClick={() => setProposedAssignment(null)} className="text-xs text-gray-400 hover:text-white">Reintentar</button>
                                                             </div>
                                                             
+                                                            {resourceError && (
+                                                                <div className="p-3 bg-red-900/30 border border-red-800 text-red-300 rounded text-xs">
+                                                                    {resourceError}
+                                                                </div>
+                                                            )}
+                                                            
                                                             <div className="space-y-3">
                                                                 <div>
                                                                     <label className="text-xs text-gray-500 uppercase">Título</label>

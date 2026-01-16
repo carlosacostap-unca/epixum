@@ -27,9 +27,18 @@ async function checkAuth() {
 export async function getAssignments(courseId: string) {
     try {
         const { user } = await checkAuth()
-
-        // Try admin client for teacher check first
         const adminClient = getAdminClient()
+
+        // Check if supervisor
+        const { data: profile } = await adminClient
+            .from('profiles')
+            .select('roles')
+            .eq('email', user.email!)
+            .single()
+        
+        const isSupervisor = profile?.roles?.includes('supervisor')
+
+        // Try admin client for teacher check
         const { data: teacherEnrollment } = await adminClient
             .from('course_enrollments')
             .select('id')
@@ -38,7 +47,7 @@ export async function getAssignments(courseId: string) {
             .eq('role', 'docente')
             .single()
             
-        if (teacherEnrollment) {
+        if (teacherEnrollment || isSupervisor) {
              const { data, error } = await adminClient
                 .from('assignments')
                 .select('*')
@@ -229,7 +238,16 @@ export async function createAssignment(courseId: string, title: string, descript
             .eq('role', 'docente')
             .single()
 
-        if (!teacherEnrollment) {
+        // Check if supervisor
+        const { data: profile } = await adminClient
+            .from('profiles')
+            .select('roles')
+            .eq('email', user.email!)
+            .single()
+        
+        const isSupervisor = profile?.roles?.includes('supervisor')
+
+        if (!teacherEnrollment && !isSupervisor) {
             throw new Error('No tienes permisos de docente en este curso')
         }
 
@@ -277,7 +295,16 @@ export async function updateAssignment(assignmentId: string, title: string, desc
             .eq('role', 'docente')
             .single()
 
-        if (!teacherEnrollment) {
+        // Check if supervisor
+        const { data: profile } = await adminClient
+            .from('profiles')
+            .select('roles')
+            .eq('email', user.email!)
+            .single()
+        
+        const isSupervisor = profile?.roles?.includes('supervisor')
+
+        if (!teacherEnrollment && !isSupervisor) {
             throw new Error('No tienes permisos de docente en este curso')
         }
 
@@ -314,7 +341,16 @@ export async function deleteAssignment(assignmentId: string, courseId: string) {
             .eq('role', 'docente')
             .single()
 
-        if (!teacherEnrollment) {
+        // Check if supervisor
+        const { data: profile } = await adminClient
+            .from('profiles')
+            .select('roles')
+            .eq('email', user.email!)
+            .single()
+        
+        const isSupervisor = profile?.roles?.includes('supervisor')
+
+        if (!teacherEnrollment && !isSupervisor) {
             throw new Error('No tienes permisos de docente en este curso')
         }
 
@@ -381,7 +417,16 @@ export async function updateSubmissionGrade(submissionId: string, grade: string)
             .eq('role', 'docente')
             .single()
 
-        if (!teacherEnrollment) {
+        // Check if supervisor
+        const { data: profile } = await adminClient
+            .from('profiles')
+            .select('roles')
+            .eq('email', user.email!)
+            .single()
+        
+        const isSupervisor = profile?.roles?.includes('supervisor')
+
+        if (!teacherEnrollment && !isSupervisor) {
             throw new Error('No tienes permisos de docente en este curso')
         }
 
@@ -594,7 +639,16 @@ export async function createAssignmentResource(assignmentId: string, title: stri
             .eq('role', 'docente')
             .single()
 
-        if (!teacherEnrollment) {
+        // Check if supervisor
+        const { data: profile } = await adminClient
+            .from('profiles')
+            .select('roles')
+            .eq('email', user.email!)
+            .single()
+        
+        const isSupervisor = profile?.roles?.includes('supervisor')
+
+        if (!teacherEnrollment && !isSupervisor) {
             throw new Error('No tienes permisos de docente en este curso')
         }
 
@@ -637,7 +691,16 @@ export async function deleteSubmission(submissionId: string) {
             .eq('role', 'docente')
             .single()
 
-        if (!teacherEnrollment) {
+        // Check if supervisor
+        const { data: profile } = await adminClient
+            .from('profiles')
+            .select('roles')
+            .eq('email', user.email!)
+            .single()
+        
+        const isSupervisor = profile?.roles?.includes('supervisor')
+
+        if (!teacherEnrollment && !isSupervisor) {
             throw new Error('No tienes permisos de docente en este curso')
         }
 
@@ -702,7 +765,16 @@ export async function updateSubmissionContent(submissionId: string, content: str
             .eq('role', 'docente')
             .single()
 
-        if (!teacherEnrollment) {
+        // Check if supervisor
+        const { data: profile } = await adminClient
+            .from('profiles')
+            .select('roles')
+            .eq('email', user.email!)
+            .single()
+        
+        const isSupervisor = profile?.roles?.includes('supervisor')
+
+        if (!teacherEnrollment && !isSupervisor) {
             throw new Error('No tienes permisos de docente en este curso')
         }
 
@@ -779,7 +851,16 @@ export async function updateAssignmentResource(resourceId: string, title: string
             .eq('role', 'docente')
             .single()
 
-        if (!teacherEnrollment) {
+        // Check if supervisor
+        const { data: profile } = await adminClient
+            .from('profiles')
+            .select('roles')
+            .eq('email', user.email!)
+            .single()
+        
+        const isSupervisor = profile?.roles?.includes('supervisor')
+
+        if (!teacherEnrollment && !isSupervisor) {
             throw new Error('No tienes permisos de docente en este curso')
         }
 
@@ -831,7 +912,16 @@ export async function deleteAssignmentResource(resourceId: string) {
             .eq('role', 'docente')
             .single()
 
-        if (!teacherEnrollment) {
+        // Check if supervisor
+        const { data: profile } = await adminClient
+            .from('profiles')
+            .select('roles')
+            .eq('email', user.email!)
+            .single()
+        
+        const isSupervisor = profile?.roles?.includes('supervisor')
+
+        if (!teacherEnrollment && !isSupervisor) {
             throw new Error('No tienes permisos de docente en este curso')
         }
 
