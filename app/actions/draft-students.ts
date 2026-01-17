@@ -41,17 +41,60 @@ export async function saveDraftStudents(courseId: string, students: any[]) {
             updated_at: new Date().toISOString()
         }))
 
-        // Upsert permite actualizar si ya existe (basado en unique constraint, 
-        // pero draft_students no tiene unique en email+course_id por defecto a menos que lo hayamos creado así.
-        // Asumimos que queremos insertar nuevos. Si queremos upsert, necesitamos constraint.
-        // Por ahora haremos insert y si falla por duplicado lo manejamos o usamos upsert con conflict on ID si tuviéramos IDs.
-        // Mejor usar upsert con onConflict: 'course_id, email' si existe esa constraint.
+        // Use Admin Client to ensure we can save drafts even if RLS is tricky for some roles
+        // (assuming the user has permission to manage the course)
+        const adminClient = createAdminClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!,
+            {
+                auth: {
+                    autoRefreshToken: false,
+                    persistSession: false
+                }
+            }
+        )
         
-        // Verificamos si existe la tabla y sus constraints. 
-        // Para simplificar, primero borramos los que coincidan (si se quiere reemplazar) o simplemente insertamos.
-        // El usuario pidió "guardar", usualmente es agregar.
+        // Verify permissions (Admin, Supervisor, or Teacher)
+        // Check Profile for Supervisor/Admin roles
+        const { data: profile } = await adminClient
+            .from('profiles')
+            .select('roles')
+            .eq('email', user.email!)
+            .single()
         
-        const { error } = await supabase
+        const isGlobalAdmin = profile?.roles?.includes('admin-plataforma')
+        const isSupervisor = profile?.roles?.includes('supervisor')
+
+        // Check teacher enrollment
+        const { data: teacherEnrollment } = await adminClient
+            .from('course_enrollments')
+            .select('id')
+            .eq('course_id', courseId)
+            .ilike('email', user.email!)
+            .in('role', ['docente', 'admin-institucion'])
+            .maybeSingle()
+            
+        // Check institution admin
+        let isInstitutionAdmin = false
+        if (!isGlobalAdmin && !isSupervisor && !teacherEnrollment) {
+            const { data: course } = await adminClient.from('courses').select('institution_id').eq('id', courseId).single()
+            if (course) {
+                 const { data: instRole } = await adminClient
+                    .from('institution_roles')
+                    .select('id')
+                    .eq('institution_id', course.institution_id)
+                    .eq('email', user.email!)
+                    .eq('role', 'admin-institucion')
+                    .maybeSingle()
+                 if (instRole) isInstitutionAdmin = true
+            }
+        }
+
+        if (!isGlobalAdmin && !isSupervisor && !teacherEnrollment && !isInstitutionAdmin) {
+            return { success: false, error: 'No autorizado para guardar borradores en este curso' }
+        }
+
+        const { error } = await adminClient
             .from('draft_students')
             .upsert(validStudents, { onConflict: 'course_id, email' }) 
 
@@ -78,7 +121,56 @@ export async function checkDraftStudentsByEmail(courseId: string, emails: string
             return { success: true, data: { found: [], notFound: [] } }
         }
 
-        const { data: foundStudents, error } = await supabase
+        // Use Admin Client to bypass RLS
+        const adminClient = createAdminClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!,
+            {
+                auth: {
+                    autoRefreshToken: false,
+                    persistSession: false
+                }
+            }
+        )
+
+        // Verify permissions
+        const { data: profile } = await adminClient
+            .from('profiles')
+            .select('roles')
+            .eq('email', user.email!)
+            .single()
+        
+        const isGlobalAdmin = profile?.roles?.includes('admin-plataforma')
+        const isSupervisor = profile?.roles?.includes('supervisor')
+
+        const { data: teacherEnrollment } = await adminClient
+            .from('course_enrollments')
+            .select('id')
+            .eq('course_id', courseId)
+            .ilike('email', user.email!)
+            .in('role', ['docente', 'admin-institucion'])
+            .maybeSingle()
+
+        let isInstitutionAdmin = false
+        if (!isGlobalAdmin && !isSupervisor && !teacherEnrollment) {
+            const { data: course } = await adminClient.from('courses').select('institution_id').eq('id', courseId).single()
+            if (course) {
+                 const { data: instRole } = await adminClient
+                    .from('institution_roles')
+                    .select('id')
+                    .eq('institution_id', course.institution_id)
+                    .eq('email', user.email!)
+                    .eq('role', 'admin-institucion')
+                    .maybeSingle()
+                 if (instRole) isInstitutionAdmin = true
+            }
+        }
+
+        if (!isGlobalAdmin && !isSupervisor && !teacherEnrollment && !isInstitutionAdmin) {
+             return { success: false, error: 'No autorizado para ver borradores de este curso' }
+        }
+
+        const { data: foundStudents, error } = await adminClient
             .from('draft_students')
             .select('*')
             .eq('course_id', courseId)
@@ -91,13 +183,17 @@ export async function checkDraftStudentsByEmail(courseId: string, emails: string
 
         // Check if already enrolled
         const foundEmailsList = foundStudents?.map(s => cleanEmail(s.email)) || []
-        const { data: enrolledData } = await supabase
-            .from('course_enrollments')
-            .select('email')
-            .eq('course_id', courseId)
-            .in('email', foundEmailsList)
         
-        const enrolledSet = new Set(enrolledData?.map(e => cleanEmail(e.email)))
+        let enrolledSet = new Set()
+        if (foundEmailsList.length > 0) {
+            const { data: enrolledData } = await adminClient
+                .from('course_enrollments')
+                .select('email')
+                .eq('course_id', courseId)
+                .in('email', foundEmailsList)
+            
+            enrolledSet = new Set(enrolledData?.map(e => cleanEmail(e.email)))
+        }
 
         const foundWithStatus = foundStudents?.map(s => ({
             ...s,
@@ -120,10 +216,14 @@ export async function checkDraftStudentsByEmail(courseId: string, emails: string
 
 export async function batchEnrollStudents(courseId: string, students: any[]) {
     try {
-        // 1. Check permissions
-        await checkInstitutionAdmin()
-
-        // 2. Create Admin Client for privileged operations
+        // 1. Check permissions (We should allow teachers too if they have access)
+        // Previously: await checkInstitutionAdmin()
+        
+        // We will do a custom check similar to above to allow teachers
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) throw new Error('No autenticado')
+            
         const adminClient = createAdminClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -134,6 +234,43 @@ export async function batchEnrollStudents(courseId: string, students: any[]) {
                 }
             }
         )
+
+        // Verify permissions
+        const { data: profile } = await adminClient
+            .from('profiles')
+            .select('roles')
+            .eq('email', user.email!)
+            .single()
+        
+        const isGlobalAdmin = profile?.roles?.includes('admin-plataforma')
+        const isSupervisor = profile?.roles?.includes('supervisor')
+
+        const { data: teacherEnrollment } = await adminClient
+            .from('course_enrollments')
+            .select('id')
+            .eq('course_id', courseId)
+            .ilike('email', user.email!)
+            .in('role', ['docente', 'admin-institucion'])
+            .maybeSingle()
+
+        let isInstitutionAdmin = false
+        if (!isGlobalAdmin && !isSupervisor && !teacherEnrollment) {
+            const { data: course } = await adminClient.from('courses').select('institution_id').eq('id', courseId).single()
+            if (course) {
+                 const { data: instRole } = await adminClient
+                    .from('institution_roles')
+                    .select('id')
+                    .eq('institution_id', course.institution_id)
+                    .eq('email', user.email!)
+                    .eq('role', 'admin-institucion')
+                    .maybeSingle()
+                 if (instRole) isInstitutionAdmin = true
+            }
+        }
+
+        if (!isGlobalAdmin && !isSupervisor && !teacherEnrollment && !isInstitutionAdmin) {
+             throw new Error('No autorizado para matricular estudiantes en este curso')
+        }
 
         const results = {
             success: [] as string[],
