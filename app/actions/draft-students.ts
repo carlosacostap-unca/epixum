@@ -173,16 +173,40 @@ export async function checkDraftStudentsByEmail(courseId: string, emails: string
         const { data: foundStudents, error } = await adminClient
             .from('draft_students')
             .select('*')
-            .eq('course_id', courseId)
             .in('email', uniqueEmails)
+            // .eq('course_id', courseId) // Removed to allow finding drafts from other courses
 
         if (error) throw error
 
-        const foundEmails = new Set(foundStudents?.map(s => cleanEmail(s.email)))
+        // Filter: If multiple drafts exist for same email, prioritize the one matching courseId, then latest
+        const bestDraftsMap = new Map();
+        
+        foundStudents?.forEach(draft => {
+            const email = cleanEmail(draft.email);
+            const existing = bestDraftsMap.get(email);
+            
+            if (!existing) {
+                bestDraftsMap.set(email, draft);
+            } else {
+                // If current matches course and existing doesn't, swap
+                if (draft.course_id === courseId && existing.course_id !== courseId) {
+                    bestDraftsMap.set(email, draft);
+                }
+                // If neither matches course (or both do), pick latest
+                else if ((draft.course_id === courseId) === (existing.course_id === courseId)) {
+                    if (new Date(draft.created_at) > new Date(existing.created_at)) {
+                        bestDraftsMap.set(email, draft);
+                    }
+                }
+            }
+        });
+
+        const distinctFoundStudents = Array.from(bestDraftsMap.values());
+        const foundEmails = new Set(distinctFoundStudents.map((s: any) => cleanEmail(s.email)))
         const notFoundEmails = uniqueEmails.filter(email => !foundEmails.has(email))
 
         // Check if already enrolled
-        const foundEmailsList = foundStudents?.map(s => cleanEmail(s.email)) || []
+        const foundEmailsList = distinctFoundStudents.map((s: any) => cleanEmail(s.email))
         
         let enrolledSet = new Set()
         if (foundEmailsList.length > 0) {
@@ -195,11 +219,11 @@ export async function checkDraftStudentsByEmail(courseId: string, emails: string
             enrolledSet = new Set(enrolledData?.map(e => cleanEmail(e.email)))
         }
 
-        const foundWithStatus = foundStudents?.map(s => ({
+        const foundWithStatus = distinctFoundStudents.map((s: any) => ({
             ...s,
             email: cleanEmail(s.email),
             is_enrolled: enrolledSet.has(cleanEmail(s.email))
-        })) || []
+        }))
 
         return {
             success: true,
