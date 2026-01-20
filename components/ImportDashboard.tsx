@@ -1507,17 +1507,16 @@ export default function ImportDashboard() {
                                         </thead>
                                         <tbody className="divide-y divide-neutral-700">
                                             {[...students].sort((a, b) => {
-                                                const nameA = a.last_name && a.first_name 
-                                                    ? `${a.last_name}, ${a.first_name}` 
-                                                    : a.email
-                                                const nameB = b.last_name && b.first_name 
-                                                    ? `${b.last_name}, ${b.first_name}` 
-                                                    : b.email
+                                                const partsA = [a.last_name, a.first_name].filter(Boolean)
+                                                const nameA = partsA.length > 0 ? partsA.join(', ') : a.email
+                                                
+                                                const partsB = [b.last_name, b.first_name].filter(Boolean)
+                                                const nameB = partsB.length > 0 ? partsB.join(', ') : b.email
+                                                
                                                 return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' })
                                             }).map(student => {
-                                                const studentName = student.last_name && student.first_name 
-                                                    ? `${student.last_name}, ${student.first_name}` 
-                                                    : student.email
+                                                const nameParts = [student.last_name, student.first_name].filter(Boolean)
+                                                const studentName = nameParts.length > 0 ? nameParts.join(', ') : student.email
                                                 
                                                 return (
                                                     <tr key={student.email} className="hover:bg-neutral-700/30">

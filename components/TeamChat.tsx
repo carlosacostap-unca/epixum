@@ -17,7 +17,7 @@ export default function TeamChat({ teamId, currentUserEmail }: { teamId: string,
     const [loading, setLoading] = useState(true)
     const [isRealtimeConnected, setIsRealtimeConnected] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
-    const supabase = createClient()
+    const [supabase] = useState(() => createClient())
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })

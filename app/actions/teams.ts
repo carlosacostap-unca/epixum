@@ -112,6 +112,7 @@ export async function createTeam(formData: FormData) {
         if (error) throw error
 
         revalidatePath(`/teacher/courses/${courseId}`)
+        revalidatePath(`/student/courses/${courseId}`)
         return { success: true }
     } catch (error: unknown) {
         return { success: false, error: (error as Error).message }
@@ -131,6 +132,7 @@ export async function deleteTeam(teamId: string, courseId: string) {
         if (error) throw error
 
         revalidatePath(`/teacher/courses/${courseId}`)
+        revalidatePath(`/student/courses/${courseId}`)
         return { success: true }
     } catch (error: unknown) {
         return { success: false, error: (error as Error).message }
@@ -155,6 +157,7 @@ export async function assignStudentToTeam(courseId: string, email: string, teamI
         if (error) throw error
 
         revalidatePath(`/teacher/courses/${courseId}`)
+        revalidatePath(`/student/courses/${courseId}`)
         return { success: true }
     } catch (error: unknown) {
         return { success: false, error: (error as Error).message }
@@ -175,6 +178,7 @@ export async function removeStudentFromTeam(courseId: string, email: string) {
         if (error) throw error
 
         revalidatePath(`/teacher/courses/${courseId}`)
+        revalidatePath(`/student/courses/${courseId}`)
         return { success: true }
     } catch (error: unknown) {
         return { success: false, error: (error as Error).message }
@@ -217,6 +221,19 @@ async function checkStudentAccess(courseId: string) {
         }
     )
 
+    // Check if user is enrolled as student in this course
+    const { data: enrollment, error } = await adminClient
+        .from('course_enrollments')
+        .select('id, team_id')
+        .eq('course_id', courseId)
+        .eq('email', user.email)
+        .in('role', ['estudiante', 'alumno'])
+        .single()
+
+    if (enrollment) {
+        return { supabase: adminClient, user, enrollment }
+    }
+
     // Check if supervisor
     const { data: profile } = await supabase
         .from('profiles')
@@ -232,15 +249,6 @@ async function checkStudentAccess(courseId: string) {
             enrollment: { id: 'supervisor-bypass', team_id: null } 
         }
     }
-
-    // Check if user is enrolled as student in this course
-    const { data: enrollment, error } = await adminClient
-        .from('course_enrollments')
-        .select('id, team_id')
-        .eq('course_id', courseId)
-        .eq('email', user.email)
-        .in('role', ['estudiante', 'alumno'])
-        .single()
 
     if (error || !enrollment) {
         throw new Error('No autorizado: No es estudiante de este curso')
