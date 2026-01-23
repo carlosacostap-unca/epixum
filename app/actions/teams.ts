@@ -234,19 +234,19 @@ async function checkStudentAccess(courseId: string) {
         return { supabase: adminClient, user, enrollment }
     }
 
-    // Check if supervisor
+    // Check if guest (invitado)
     const { data: profile } = await supabase
         .from('profiles')
         .select('roles')
         .eq('email', user.email)
         .single()
 
-    if (profile?.roles?.includes('supervisor')) {
-        // Return dummy enrollment for supervisor (no team)
+    if (profile?.roles?.includes('invitado')) {
+        // Return dummy enrollment for guest (no team)
         return { 
             supabase: adminClient, 
             user, 
-            enrollment: { id: 'supervisor-bypass', team_id: null } 
+            enrollment: { id: 'guest-bypass', team_id: null } 
         }
     }
 

@@ -135,8 +135,17 @@ export async function getSprintReviews(courseId: string) {
             .eq('email', user.email)
             .limit(1)
             .maybeSingle()
+        
+        // Check if guest (invitado)
+        const { data: profile } = await adminClient
+            .from('profiles')
+            .select('roles')
+            .eq('email', user.email!)
+            .single()
+        
+        const isGuest = profile?.roles?.includes('invitado')
 
-        let authorized = !!enrollment;
+        let authorized = !!enrollment || isGuest;
 
         // If not enrolled, check if Admin
         if (!authorized) {

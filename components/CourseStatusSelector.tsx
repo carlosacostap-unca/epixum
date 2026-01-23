@@ -32,6 +32,7 @@ export default function CourseStatusSelector({
     const getStatusColor = (s: string) => {
         switch(s) {
             case 'Activo': return 'bg-green-900/30 text-green-400 border-green-800'
+            case 'En Prueba': return 'bg-yellow-900/30 text-yellow-400 border-yellow-800'
             case 'Finalizado': return 'bg-blue-900/30 text-blue-400 border-blue-800'
             default: return 'bg-neutral-800 text-gray-400 border-neutral-700'
         }
@@ -52,7 +53,7 @@ export default function CourseStatusSelector({
 
             {isOpen && (
                 <div className="absolute right-0 top-full mt-2 w-40 bg-neutral-900 border border-neutral-700 rounded-lg shadow-xl overflow-hidden z-50">
-                    {['Borrador', 'Activo', 'Finalizado'].map((s) => (
+                    {['Borrador', 'En Prueba', 'Activo', 'Finalizado'].map((s) => (
                         <button
                             key={s}
                             onClick={() => handleStatusChange(s)}

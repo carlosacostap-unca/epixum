@@ -21,7 +21,7 @@ const AVAILABLE_ROLES = [
   'nodocente',
   'admin-institucion',
   'admin-plataforma',
-  'supervisor'
+  'invitado'
 ]
 
 const ROLE_LABELS: Record<string, string> = {
@@ -30,7 +30,7 @@ const ROLE_LABELS: Record<string, string> = {
   'nodocente': 'Nodocente',
   'admin-institucion': 'Admin Institución',
   'admin-plataforma': 'Admin Plataforma',
-  'supervisor': 'Supervisor'
+  'invitado': 'Invitado'
 }
 
 export default function UserManagement({ initialUsers }: { initialUsers: any[] }) {

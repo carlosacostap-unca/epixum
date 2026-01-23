@@ -11,17 +11,17 @@ export async function getQueries(courseId: string, contextType: 'general' | 'cla
 
         if (!user || !user.email) throw new Error('No autenticado')
 
-        // Check if supervisor to bypass RLS
+        // Check if guest (invitado) to bypass RLS
         const { data: profile } = await supabase
             .from('profiles')
             .select('roles')
             .eq('email', user.email)
             .single()
         
-        const isSupervisor = profile?.roles?.includes('supervisor')
+        const isGuest = profile?.roles?.includes('invitado')
 
         let client: any = supabase
-        if (isSupervisor) {
+        if (isGuest) {
              client = createAdminClient(
                 process.env.NEXT_PUBLIC_SUPABASE_URL!,
                 process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -85,17 +85,17 @@ export async function getCourseQueries(
 
         if (!user || !user.email) throw new Error('No autenticado')
 
-        // Check if supervisor to bypass RLS
+        // Check if guest (invitado) to bypass RLS
         const { data: profile } = await supabase
             .from('profiles')
             .select('roles')
             .eq('email', user.email)
             .single()
         
-        const isSupervisor = profile?.roles?.includes('supervisor')
+        const isGuest = profile?.roles?.includes('invitado')
 
         let client: any = supabase
-        if (isSupervisor) {
+        if (isGuest) {
              client = createAdminClient(
                 process.env.NEXT_PUBLIC_SUPABASE_URL!,
                 process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -180,17 +180,17 @@ export async function getQueryResponses(queryId: string) {
 
         if (!user || !user.email) throw new Error('No autenticado')
 
-        // Check if supervisor to bypass RLS
+        // Check if guest (invitado) to bypass RLS
         const { data: profile } = await supabase
             .from('profiles')
             .select('roles')
             .eq('email', user.email)
             .single()
         
-        const isSupervisor = profile?.roles?.includes('supervisor')
+        const isGuest = profile?.roles?.includes('invitado')
 
         let client: any = supabase
-        if (isSupervisor) {
+        if (isGuest) {
              client = createAdminClient(
                 process.env.NEXT_PUBLIC_SUPABASE_URL!,
                 process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -248,17 +248,17 @@ export async function getAllCourseQueries(courseId: string) {
 
         if (!user || !user.email) throw new Error('No autenticado')
 
-        // Check if supervisor to bypass RLS
+        // Check if guest (invitado) to bypass RLS
         const { data: profile } = await supabase
             .from('profiles')
             .select('roles')
             .eq('email', user.email)
             .single()
         
-        const isSupervisor = profile?.roles?.includes('supervisor')
+        const isGuest = profile?.roles?.includes('invitado')
 
         let client: any = supabase
-        if (isSupervisor) {
+        if (isGuest) {
              client = createAdminClient(
                 process.env.NEXT_PUBLIC_SUPABASE_URL!,
                 process.env.SUPABASE_SERVICE_ROLE_KEY!,

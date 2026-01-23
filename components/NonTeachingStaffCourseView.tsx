@@ -252,6 +252,7 @@ export default function NonTeachingStaffCourseView({
                                 
                                 <span className={`text-[10px] px-2.5 py-1 rounded-full border uppercase font-bold tracking-wider ${
                                     course.status === 'Activo' ? 'bg-green-900/20 text-green-400 border-green-900/50' :
+                                    course.status === 'En Prueba' ? 'bg-yellow-900/20 text-yellow-400 border-yellow-900/50' :
                                     course.status === 'Finalizado' ? 'bg-blue-900/20 text-blue-400 border-blue-900/50' :
                                     'bg-gray-800/50 text-gray-400 border-gray-700/50'
                                 }`}>

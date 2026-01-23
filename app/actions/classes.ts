@@ -322,16 +322,16 @@ export async function getStudentCourseDetails(courseId: string) {
         const { user, supabase } = await checkAuth()
         const adminClient = getAdminClient()
 
-        // Check if supervisor
+        // Check if guest (invitado)
         const { data: profile } = await supabase
             .from('profiles')
             .select('roles')
             .eq('email', user.email!)
             .single()
         
-        const isSupervisor = profile?.roles?.includes('supervisor')
+        const isGuest = profile?.roles?.includes('invitado')
 
-        if (!isSupervisor) {
+        if (!isGuest) {
             // Verify enrollment
             const { data: enrollment, error: enrollmentError } = await adminClient
                 .from('course_enrollments')
@@ -391,16 +391,16 @@ export async function getStudentClasses(courseId: string) {
         const { user, supabase } = await checkAuth()
         const adminClient = getAdminClient()
 
-        // Check if supervisor
+        // Check if guest (invitado)
         const { data: profile } = await supabase
             .from('profiles')
             .select('roles')
             .eq('email', user.email!)
             .single()
         
-        const isSupervisor = profile?.roles?.includes('supervisor')
+        const isGuest = profile?.roles?.includes('invitado')
 
-        if (!isSupervisor) {
+        if (!isGuest) {
             // Verify enrollment
             const { data: enrollment, error: enrollmentError } = await adminClient
                 .from('course_enrollments')

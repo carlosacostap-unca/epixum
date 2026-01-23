@@ -5,7 +5,7 @@ import RoleSelectionScreen from '@/components/RoleSelectionScreen'
 import NonTeachingStaffDashboard from '@/components/NonTeachingStaffDashboard'
 import ProfileManager from '@/components/ProfileManager'
 import { getInstitutionsForUser } from '@/app/actions/institutions'
-import { getTeacherCourses, getStudentCourses, getNodocenteCourses, getSupervisorCourses } from '@/app/actions/courses'
+import { getTeacherCourses, getStudentCourses, getNodocenteCourses, getGuestCourses } from '@/app/actions/courses'
 import TeacherDashboard from '@/components/TeacherDashboard'
 import StudentDashboard from '@/components/StudentDashboard'
 
@@ -241,8 +241,8 @@ export default async function Home(props: {
       )
   }
 
-  if (effectiveRole === 'supervisor') {
-      const coursesResult = await getSupervisorCourses()
+  if (effectiveRole === 'invitado') {
+      const coursesResult = await getGuestCourses()
       const courses = coursesResult.success && coursesResult.data ? coursesResult.data : []
       
       return (

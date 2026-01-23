@@ -54,8 +54,8 @@ export async function saveDraftStudents(courseId: string, students: any[]) {
             }
         )
         
-        // Verify permissions (Admin, Supervisor, or Teacher)
-        // Check Profile for Supervisor/Admin roles
+        // Verify permissions (Admin or Teacher)
+        // Check Profile for Admin roles
         const { data: profile } = await adminClient
             .from('profiles')
             .select('roles')
@@ -63,7 +63,6 @@ export async function saveDraftStudents(courseId: string, students: any[]) {
             .single()
         
         const isGlobalAdmin = profile?.roles?.includes('admin-plataforma')
-        const isSupervisor = profile?.roles?.includes('supervisor')
 
         // Check teacher enrollment
         const { data: teacherEnrollment } = await adminClient
@@ -76,7 +75,7 @@ export async function saveDraftStudents(courseId: string, students: any[]) {
             
         // Check institution admin
         let isInstitutionAdmin = false
-        if (!isGlobalAdmin && !isSupervisor && !teacherEnrollment) {
+        if (!isGlobalAdmin && !teacherEnrollment) {
             const { data: course } = await adminClient.from('courses').select('institution_id').eq('id', courseId).single()
             if (course) {
                  const { data: instRole } = await adminClient
@@ -90,7 +89,7 @@ export async function saveDraftStudents(courseId: string, students: any[]) {
             }
         }
 
-        if (!isGlobalAdmin && !isSupervisor && !teacherEnrollment && !isInstitutionAdmin) {
+        if (!isGlobalAdmin && !teacherEnrollment && !isInstitutionAdmin) {
             return { success: false, error: 'No autorizado para guardar borradores en este curso' }
         }
 
@@ -141,7 +140,6 @@ export async function checkDraftStudentsByEmail(courseId: string, emails: string
             .single()
         
         const isGlobalAdmin = profile?.roles?.includes('admin-plataforma')
-        const isSupervisor = profile?.roles?.includes('supervisor')
 
         const { data: teacherEnrollment } = await adminClient
             .from('course_enrollments')
@@ -152,7 +150,7 @@ export async function checkDraftStudentsByEmail(courseId: string, emails: string
             .maybeSingle()
 
         let isInstitutionAdmin = false
-        if (!isGlobalAdmin && !isSupervisor && !teacherEnrollment) {
+        if (!isGlobalAdmin && !teacherEnrollment) {
             const { data: course } = await adminClient.from('courses').select('institution_id').eq('id', courseId).single()
             if (course) {
                  const { data: instRole } = await adminClient
@@ -166,7 +164,7 @@ export async function checkDraftStudentsByEmail(courseId: string, emails: string
             }
         }
 
-        if (!isGlobalAdmin && !isSupervisor && !teacherEnrollment && !isInstitutionAdmin) {
+        if (!isGlobalAdmin && !teacherEnrollment && !isInstitutionAdmin) {
              return { success: false, error: 'No autorizado para ver borradores de este curso' }
         }
 
@@ -267,7 +265,6 @@ export async function batchEnrollStudents(courseId: string, students: any[]) {
             .single()
         
         const isGlobalAdmin = profile?.roles?.includes('admin-plataforma')
-        const isSupervisor = profile?.roles?.includes('supervisor')
 
         const { data: teacherEnrollment } = await adminClient
             .from('course_enrollments')
@@ -278,7 +275,7 @@ export async function batchEnrollStudents(courseId: string, students: any[]) {
             .maybeSingle()
 
         let isInstitutionAdmin = false
-        if (!isGlobalAdmin && !isSupervisor && !teacherEnrollment) {
+        if (!isGlobalAdmin && !teacherEnrollment) {
             const { data: course } = await adminClient.from('courses').select('institution_id').eq('id', courseId).single()
             if (course) {
                  const { data: instRole } = await adminClient
@@ -292,7 +289,7 @@ export async function batchEnrollStudents(courseId: string, students: any[]) {
             }
         }
 
-        if (!isGlobalAdmin && !isSupervisor && !teacherEnrollment && !isInstitutionAdmin) {
+        if (!isGlobalAdmin && !teacherEnrollment && !isInstitutionAdmin) {
              throw new Error('No autorizado para matricular estudiantes en este curso')
         }
 

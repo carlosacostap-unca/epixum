@@ -460,6 +460,7 @@ export async function getTeacherCourses() {
                     id,
                     name,
                     description,
+                    status,
                     start_date,
                     end_date,
                     institution_id,
@@ -485,6 +486,7 @@ export async function getTeacherCourses() {
                 id: course.id,
                 name: course.name,
                 description: course.description,
+                status: course.status,
                 start_date: course.start_date,
                 end_date: course.end_date,
                 institution_id: course.institution_id,
@@ -526,6 +528,7 @@ export async function getNodocenteCourses() {
                     id,
                     name,
                     description,
+                    status,
                     start_date,
                     end_date,
                     institution_id,
@@ -551,6 +554,7 @@ export async function getNodocenteCourses() {
                 id: course.id,
                 name: course.name,
                 description: course.description,
+                status: course.status,
                 start_date: course.start_date,
                 end_date: course.end_date,
                 institution_id: course.institution_id,
@@ -726,6 +730,7 @@ export async function getStudentCourses() {
                     id,
                     name,
                     description,
+                    status,
                     start_date,
                     end_date,
                     institution_id,
@@ -751,6 +756,7 @@ export async function getStudentCourses() {
                 id: course.id,
                 name: course.name,
                 description: course.description,
+                status: course.status,
                 start_date: course.start_date,
                 end_date: course.end_date,
                 institution_id: course.institution_id,
@@ -1421,22 +1427,22 @@ export async function getCourseForNodocente(courseId: string) {
     }
 }
 
-export async function getSupervisorCourses() {
+export async function getGuestCourses() {
     try {
         const supabase = await createClient()
         const { data: { user } } = await supabase.auth.getUser()
 
         if (!user || !user.email) throw new Error('No autenticado')
         
-        // Verify supervisor role
+        // Verify guest (invitado) role
         const { data: profile } = await supabase
             .from('profiles')
             .select('roles')
             .eq('email', user.email)
             .single()
             
-        if (!profile?.roles?.includes('supervisor')) {
-             throw new Error('No autorizado: Requiere rol de Supervisor')
+        if (!profile?.roles?.includes('invitado')) {
+             throw new Error('No autorizado: Requiere rol de Invitado')
         }
 
         const adminClient = createAdminClient(

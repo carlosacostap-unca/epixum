@@ -106,14 +106,14 @@ export async function getSprints(courseId: string) {
                  return { success: true, data }
             }
 
-            // Check if supervisor
+            // Check if guest (invitado)
             const { data: profile } = await supabase
                 .from('profiles')
                 .select('roles')
                 .eq('email', user.email)
                 .single()
 
-            if (profile?.roles?.includes('supervisor')) {
+            if (profile?.roles?.includes('invitado')) {
                  const { data, error } = await adminClient
                     .from('sprints')
                     .select('*')

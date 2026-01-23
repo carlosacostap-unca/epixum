@@ -19,6 +19,8 @@ function getStatusColor(status: string | null) {
     switch (status) {
         case 'Activo':
             return 'bg-green-500/20 text-green-400 border-green-500/30'
+        case 'En Prueba':
+            return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
         case 'Finalizado':
             return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
         default: // Borrador
@@ -56,6 +58,7 @@ export default function CourseManagement({
 
     const groupedCourses = {
         'Borrador': filteredCourses.filter(c => !c.status || c.status === 'Borrador'),
+        'En Prueba': filteredCourses.filter(c => c.status === 'En Prueba'),
         'Activo': filteredCourses.filter(c => c.status === 'Activo'),
         'Finalizado': filteredCourses.filter(c => c.status === 'Finalizado')
     }
@@ -255,6 +258,20 @@ export default function CourseManagement({
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         {groupedCourses['Borrador'].map(renderCourseCard)}
+                    </div>
+                </div>
+            )}
+
+            {/* En Prueba Section */}
+            {(groupedCourses['En Prueba'].length > 0) && (
+                <div>
+                    <h2 className="text-lg font-semibold text-yellow-400 mb-4 flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
+                        En Prueba
+                        <span className="text-xs bg-yellow-900/30 border border-yellow-900 px-2 py-0.5 rounded text-yellow-500">{groupedCourses['En Prueba'].length}</span>
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {groupedCourses['En Prueba'].map(renderCourseCard)}
                     </div>
                 </div>
             )}

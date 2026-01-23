@@ -31,6 +31,7 @@ export default function TeacherDashboard({ courses, userEmail, profile, hasMulti
 
     const groupedCourses = {
         'Borrador': filteredCourses.filter(c => !c.status || c.status === 'Borrador'),
+        'En Prueba': filteredCourses.filter(c => c.status === 'En Prueba'),
         'Activo': filteredCourses.filter(c => c.status === 'Activo'),
         'Finalizado': filteredCourses.filter(c => c.status === 'Finalizado')
     }
@@ -47,6 +48,7 @@ export default function TeacherDashboard({ courses, userEmail, profile, hasMulti
                                 </span>
                                 <span className={`text-[10px] px-2 py-0.5 rounded border uppercase font-bold tracking-wider ${
                                     course.status === 'Activo' ? 'bg-green-900/30 text-green-400 border-green-800' :
+                                    course.status === 'En Prueba' ? 'bg-yellow-900/30 text-yellow-400 border-yellow-800' :
                                     course.status === 'Finalizado' ? 'bg-blue-900/30 text-blue-400 border-blue-800' :
                                     'bg-gray-800 text-gray-400 border-gray-700'
                                 }`}>
@@ -123,6 +125,20 @@ export default function TeacherDashboard({ courses, userEmail, profile, hasMulti
                                     </h3>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         {groupedCourses['Borrador'].map(renderCourseCard)}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* En Prueba Section */}
+                            {(groupedCourses['En Prueba'].length > 0) && (
+                                <div>
+                                    <h3 className="text-lg font-semibold text-yellow-400 mb-4 flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
+                                        En Prueba
+                                        <span className="text-xs bg-yellow-900/30 border border-yellow-900 px-2 py-0.5 rounded text-yellow-500">{groupedCourses['En Prueba'].length}</span>
+                                    </h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {groupedCourses['En Prueba'].map(renderCourseCard)}
                                     </div>
                                 </div>
                             )}

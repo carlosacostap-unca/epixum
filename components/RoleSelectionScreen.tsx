@@ -13,7 +13,7 @@ const ROLE_NAMES: Record<string, string> = {
   'docente': 'Docente',
   'nodocente': 'No Docente',
   'estudiante': 'Estudiante',
-  'supervisor': 'Supervisor'
+  'invitado': 'Invitado'
 }
 
 const ROLE_DESCRIPTIONS: Record<string, string> = {
@@ -22,7 +22,7 @@ const ROLE_DESCRIPTIONS: Record<string, string> = {
   'docente': 'Acceso a cursos, calificaciones y material educativo.',
   'nodocente': 'Funciones administrativas y de soporte.',
   'estudiante': 'Acceso a tus cursos y progreso académico.',
-  'supervisor': 'Visualización de cursos como estudiante.'
+  'invitado': 'Visualización de cursos (Clases, Recursos y Sprints).'
 }
 
 export default function RoleSelectionScreen({ roles, userEmail }: RoleSelectionScreenProps) {
