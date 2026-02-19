@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useState, useCallback } from 'react'
 import Script from 'next/script'
@@ -99,8 +100,18 @@ function LoginForm() {
 
       <div className="w-full max-w-md space-y-8 rounded-2xl bg-neutral-900 p-8 shadow-xl border border-neutral-800">
         <div className="text-center">
+          <div className="flex justify-center mb-6">
+            <Image 
+              src="/epixum-logo.png" 
+              alt="Epixum Logo" 
+              width={100} 
+              height={100}
+              className="object-contain"
+              priority
+            />
+          </div>
           <h1 className="text-3xl font-bold tracking-tight text-white">
-            Epixum Admin
+            Epixum
           </h1>
           <p className="mt-2 text-sm text-gray-400">
             Inicia sesión para acceder a la plataforma
