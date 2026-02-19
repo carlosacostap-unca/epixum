@@ -55,7 +55,11 @@ function LoginForm() {
         
         // Login exitoso, redirigir
         // Usamos window.location.href para asegurar una navegación completa y que las cookies se actualicen correctamente
-        window.location.href = '/'
+        if (data.redirectTo) {
+            window.location.href = data.redirectTo
+        } else {
+            window.location.href = '/'
+        }
         
     } catch (err: unknown) {
         console.error("Login error:", err)

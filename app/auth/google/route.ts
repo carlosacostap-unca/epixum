@@ -56,23 +56,22 @@ export async function POST(request: Request) {
 
     // If user is not in whitelist
     if (whitelistError || !whitelistedUser) {
-        console.error('[AUTH] Whitelist error or not found:', whitelistError);
-        await supabase.auth.signOut()
-        return NextResponse.json({ error: 'unauthorized_whitelist' }, { status: 403 })
+        console.log('[AUTH] User not in whitelist, proceeding as new user:', user.email);
+        // Do not sign out or return error. Just continue with null whitelistedUser.
+    } else {
+        console.log('[AUTH] Whitelisted roles:', whitelistedUser.roles);
     }
-
-    console.log('[AUTH] Whitelisted roles:', whitelistedUser.roles);
 
     // 2. Sync Profile Roles (Usando Admin Client para asegurar escritura)
     const { data: profile } = await supabaseAdmin
         .from('profiles')
-        .select('roles, first_name, last_name, dni, birth_date, phone, avatar_url')
+        .select('roles, first_name, last_name, dni, birth_date, phone, avatar_url, profile_completed')
         .eq('id', user.id)
         .single()
     
     // Default to 'user' if no roles found (though migration sets default)
     // Fix: Handle empty array [] by defaulting to ['estudiante']
-    const userRoles = (whitelistedUser.roles && whitelistedUser.roles.length > 0) 
+    const userRoles = (whitelistedUser?.roles && whitelistedUser.roles.length > 0) 
                       ? whitelistedUser.roles 
                       : ['estudiante'];
     
@@ -88,12 +87,13 @@ export async function POST(request: Request) {
         const profileData: any = {
             roles: userRoles,
             avatar_url: avatarUrl,
+            profile_completed: false, // Explicitly set to false for new users
             // Only include fields that actually exist in whitelist
-            ...(whitelistedUser.first_name && { first_name: whitelistedUser.first_name }),
-            ...(whitelistedUser.last_name && { last_name: whitelistedUser.last_name }),
-            ...(whitelistedUser.dni && { dni: whitelistedUser.dni }),
-            ...(whitelistedUser.birth_date && { birth_date: whitelistedUser.birth_date }),
-            ...(whitelistedUser.phone && { phone: whitelistedUser.phone }),
+            ...(whitelistedUser?.first_name && { first_name: whitelistedUser.first_name }),
+            ...(whitelistedUser?.last_name && { last_name: whitelistedUser.last_name }),
+            ...(whitelistedUser?.dni && { dni: whitelistedUser.dni }),
+            ...(whitelistedUser?.birth_date && { birth_date: whitelistedUser.birth_date }),
+            ...(whitelistedUser?.phone && { phone: whitelistedUser.phone }),
         };
 
         const { error: insertError } = await supabaseAdmin.from('profiles').insert({
@@ -101,11 +101,17 @@ export async function POST(request: Request) {
             email: user.email,
             ...profileData
         })
+
         if (insertError) {
-            console.error('[AUTH] Failed to insert profile:', insertError)
-        } else {
-            console.log('[AUTH] Profile inserted successfully')
+            console.error('[AUTH] Profile creation error:', insertError);
+            return NextResponse.json({ error: 'profile_creation_failed' }, { status: 500 })
         }
+        
+        // Return redirect to complete profile for new users
+        return NextResponse.json({ 
+            success: true, 
+            redirectTo: '/complete-profile' 
+        })
     } else {
             // IF PROFILE EXISTS: 
             // 1. Sync ROLES from whitelist.
@@ -134,9 +140,7 @@ export async function POST(request: Request) {
                     .eq('id', user.id)
                 
                 if (updateError) {
-                    console.error('[AUTH] Failed to update profile:', updateError)
-                } else {
-                    console.log('[AUTH] Profile synced successfully')
+                     console.error('[AUTH] Profile update error:', updateError);
                 }
             }
     }
@@ -147,7 +151,15 @@ export async function POST(request: Request) {
             await supabase.auth.signOut()
             return NextResponse.json({ error: 'unauthorized_role' }, { status: 403 })
     }
+
+    // Final check for redirect (in case existing user hasn't completed profile)
+    if (profile && !profile.profile_completed) {
+        return NextResponse.json({ 
+           success: true, 
+           redirectTo: '/complete-profile' 
+       })
+   }
   }
 
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true, redirectTo: '/' })
 }

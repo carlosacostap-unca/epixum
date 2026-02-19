@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { getMyProfile, updateMyProfile } from '@/app/actions/profile'
@@ -46,6 +47,7 @@ export default function CompleteProfile() {
     data.append('dni', formData.dni)
     data.append('birth_date', formData.birth_date)
     data.append('phone', formData.phone)
+    data.append('profile_completed', 'true')
 
     const result = await updateMyProfile(data)
 
@@ -70,11 +72,21 @@ export default function CompleteProfile() {
     <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
+          <div className="flex justify-center mb-6">
+            <Image 
+              src="/epixum-logo.png" 
+              alt="Epixum Logo" 
+              width={100} 
+              height={100}
+              className="object-contain"
+              priority
+            />
+          </div>
           <h2 className="mt-6 text-3xl font-bold tracking-tight text-white">
-            Completa tu Perfil
+            ¡Bienvenido a Epixum!
           </h2>
           <p className="mt-2 text-sm text-gray-400">
-            Para continuar, necesitamos que completes tu información personal.
+            Por favor, confirma tus datos personales para continuar.
           </p>
         </div>
 
