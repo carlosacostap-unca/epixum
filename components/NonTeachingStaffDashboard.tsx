@@ -45,6 +45,17 @@ export default function NonTeachingStaffDashboard({
                 <p className="text-gray-400 mt-1">
                     Usuario: <span className="font-medium text-gray-200">{userEmail}</span>
                 </p>
+                <div className="mt-4">
+                    <Link 
+                        href="/nodocente/admissions" 
+                        className="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-md shadow-sm transition-colors"
+                    >
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                        </svg>
+                        Ver Solicitudes de Admisión
+                    </Link>
+                </div>
              </div>
              <div className="flex gap-4 items-center">
                  {profile && <ProfileManager initialProfile={profile} hasMultipleRoles={hasMultipleRoles} />}

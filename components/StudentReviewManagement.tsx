@@ -80,12 +80,12 @@ export default function StudentReviewManagement({
 
     return (
         <div className="w-full">
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <h2 className="text-xl font-bold text-gray-100">Turnos de Revisión</h2>
                 <select 
                     value={selectedSprint}
                     onChange={(e) => setSelectedSprint(e.target.value)}
-                    className="bg-neutral-900 border border-neutral-800 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                    className="w-full md:w-auto bg-neutral-900 border border-neutral-800 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
                 >
                     <option value="">Todos los Sprints</option>
                     {sprints.map(s => (

@@ -112,13 +112,13 @@ export default function SprintList({
                     {/* Selected Sprint Content */}
                     {selectedSprint && (
                         <div className="space-y-6">
-                            <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6">
-                                <h3 className="text-2xl font-bold text-white mb-2">{selectedSprint.title}</h3>
+                            <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4 md:p-6">
+                                <h3 className="text-xl md:text-2xl font-bold text-white mb-2">{selectedSprint.title}</h3>
                                 {selectedSprint.description && (
-                                    <p className="text-gray-400 mb-4">{selectedSprint.description}</p>
+                                    <p className="text-gray-400 mb-4 text-sm md:text-base">{selectedSprint.description}</p>
                                 )}
                                 
-                                <div className="flex gap-6 text-sm text-gray-500 font-mono bg-black/20 p-3 rounded-md inline-flex border border-neutral-800/50">
+                                <div className="flex flex-col sm:flex-row gap-3 sm:gap-6 text-sm text-gray-500 font-mono bg-black/20 p-3 rounded-md border border-neutral-800/50 w-full sm:w-auto">
                                     <div className="flex items-center gap-2">
                                         <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
                                         <span>Inicio: {formatDate(selectedSprint.start_date)}</span>

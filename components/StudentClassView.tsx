@@ -70,10 +70,10 @@ export default function StudentClassView({ courseId, classes, sprints = [] }: St
                     <div key={cls.id} className="bg-neutral-900 border border-neutral-800 rounded-lg overflow-hidden">
                         <div 
                             onClick={() => toggleClass(cls.id)}
-                            className="p-6 cursor-pointer hover:bg-neutral-800/50 transition-colors flex justify-between items-start"
+                            className="p-4 md:p-6 cursor-pointer hover:bg-neutral-800/50 transition-colors flex justify-between items-start gap-4"
                         >
-                            <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
+                            <div className="flex-1 min-w-0">
+                                <div className="flex flex-wrap items-center gap-2 mb-2">
                                     <span className="text-xs font-medium text-indigo-400 bg-indigo-900/30 px-2 py-1 rounded">
                                         Clase
                                     </span>
@@ -82,13 +82,13 @@ export default function StudentClassView({ courseId, classes, sprints = [] }: St
                                             {sprintTitle}
                                         </span>
                                     )}
-                                    <span className="text-xs text-gray-500">
+                                    <span className="text-xs text-gray-500 whitespace-nowrap">
                                         {formatDate(cls.date)}
                                     </span>
                                 </div>
-                                <h3 className="text-xl font-bold text-gray-100">{cls.title}</h3>
+                                <h3 className="text-lg md:text-xl font-bold text-gray-100 break-words">{cls.title}</h3>
                             </div>
-                            <div className="text-gray-400 ml-4 mt-1">
+                            <div className="text-gray-400 ml-0 md:ml-4 mt-1 flex-shrink-0">
                                 {isExpanded ? (
                                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>
                                 ) : (

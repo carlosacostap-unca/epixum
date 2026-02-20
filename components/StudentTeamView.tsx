@@ -46,7 +46,7 @@ export default function StudentTeamView({ team, currentUserEmail }: StudentTeamV
     return (
         <div className="flex flex-col gap-8">
             {/* Header */}
-            <div className="bg-neutral-900 rounded-lg p-6 border border-neutral-800">
+            <div className="bg-neutral-900 rounded-lg p-4 md:p-6 border border-neutral-800">
                 <h2 className="text-2xl font-bold text-indigo-400 mb-1">{team.name}</h2>
                 <p className="text-gray-500 text-sm">Tu equipo asignado</p>
             </div>

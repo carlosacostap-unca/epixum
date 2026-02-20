@@ -1,6 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import ProfileManager from '@/components/ProfileManager'
 import { formatDateForDisplay } from '@/utils/date'
 
@@ -22,20 +24,49 @@ interface StudentDashboardProps {
 }
 
 export default function StudentDashboard({ courses, userEmail, profile, hasMultipleRoles = false }: StudentDashboardProps) {
+    const [imageError, setImageError] = useState(false)
+
     return (
-        <div className="flex min-h-screen flex-col items-center p-8 bg-black font-[family-name:var(--font-geist-sans)]">
+        <div className="flex min-h-screen flex-col items-center p-4 md:p-8 bg-black font-[family-name:var(--font-geist-sans)]">
             <main className="w-full max-w-4xl flex flex-col gap-8 items-start">
-                <div className="flex justify-between w-full items-center bg-neutral-900 p-6 rounded-lg shadow-sm border border-neutral-800">
-                    <div>
-                        <h1 className="text-3xl font-bold text-gray-100">Panel del Estudiante</h1>
-                        <p className="text-gray-400 mt-1">
-                            Usuario: <span className="font-medium text-gray-200">{userEmail}</span>
-                            <span className="mx-2 text-gray-600">|</span>
-                            Rol: <span className="text-indigo-400 font-semibold">Estudiante</span>
-                        </p>
+                <div className="flex flex-col md:flex-row justify-between w-full items-center bg-neutral-900 p-6 rounded-lg shadow-sm border border-neutral-800 gap-4">
+                    <div className="flex items-center gap-3">
+                        <Image 
+                            src="/epixum-logo.png" 
+                            alt="Epixum Logo" 
+                            width={40} 
+                            height={40}
+                            className="object-contain"
+                        />
+                        <span className="text-2xl font-bold text-white tracking-tight">Epixum</span>
                     </div>
-                    <div className="flex gap-4 items-center">
-                        {profile && <ProfileManager initialProfile={profile} hasMultipleRoles={hasMultipleRoles} />}
+                    <div className="flex items-center gap-6">
+                        {profile && (
+                            <Link 
+                                href="/student/profile" 
+                                className="flex items-center gap-3 text-gray-200 hover:text-indigo-400 font-medium transition-colors group"
+                            >
+                                <div className="relative w-9 h-9 rounded-full overflow-hidden border border-gray-700 group-hover:border-indigo-500/50 transition-colors bg-neutral-800">
+                                    <Image 
+                                        src={profile.avatar_url && !imageError ? profile.avatar_url : "/epixum-logo.png"} 
+                                        alt={`${profile.first_name} ${profile.last_name}`}
+                                        fill
+                                        className="object-cover"
+                                        onError={() => setImageError(true)}
+                                        sizes="36px"
+                                    />
+                                </div>
+                                <span>{profile.first_name} {profile.last_name}</span>
+                            </Link>
+                        )}
+                        <form action="/auth/signout" method="post">
+                            <button 
+                                type="submit"
+                                className="text-sm text-gray-500 hover:text-white transition-colors border border-transparent hover:border-gray-700 px-3 py-1.5 rounded-md"
+                            >
+                                Cerrar sesión
+                            </button>
+                        </form>
                     </div>
                 </div>
 

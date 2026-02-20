@@ -100,7 +100,7 @@ export default function TeamChat({ teamId, currentUserEmail }: { teamId: string,
     if (loading) return <div className="p-8 text-center text-gray-500">Cargando chat...</div>
 
     return (
-        <div className="flex flex-col h-[600px] bg-neutral-900 border border-neutral-800 rounded-lg overflow-hidden">
+        <div className="flex flex-col h-[500px] md:h-[600px] bg-neutral-900 border border-neutral-800 rounded-lg overflow-hidden">
             <div className="p-4 border-b border-neutral-800 bg-neutral-900/50 flex justify-between items-center">
                 <h3 className="font-semibold text-gray-200">Chat de Equipo</h3>
                 <div className="flex items-center gap-2" title={isRealtimeConnected ? "Conectado al chat en vivo" : "Desconectado del chat en vivo"}>
@@ -152,7 +152,7 @@ export default function TeamChat({ teamId, currentUserEmail }: { teamId: string,
                 <button 
                     type="submit"
                     disabled={!newMessage.trim()}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 md:px-6 py-2 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
                 >
                     <span>Enviar</span>
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">

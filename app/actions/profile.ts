@@ -37,6 +37,7 @@ export async function updateMyProfile(formData: FormData) {
   const dni = formData.get('dni') as string
   const birth_date = formData.get('birth_date') as string
   const phone = formData.get('phone') as string
+  const course_interest = formData.get('course_interest') as string
   const profile_completed = formData.get('profile_completed') === 'true'
 
   // Validate required fields if completing profile
@@ -52,6 +53,7 @@ export async function updateMyProfile(formData: FormData) {
   if (dni !== null) updateData.dni = dni || null
   if (birth_date !== null) updateData.birth_date = birth_date || null
   if (phone !== null) updateData.phone = phone || null
+  if (course_interest !== null) updateData.course_interest = course_interest || null
   if (profile_completed) updateData.profile_completed = true
 
   const { error } = await supabase

@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { getStudentClasses, getStudentCourseDetails } from '@/app/actions/classes'
 import { getStudentAssignments, getMyCourseSubmissions } from '@/app/actions/assignments'
 import { getSprints } from '@/app/actions/sprints'

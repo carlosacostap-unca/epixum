@@ -712,18 +712,18 @@ function QueryItem({ query, courseId, currentUserEmail, isTeacher, contextLabel,
             <div className="p-4 cursor-pointer hover:bg-neutral-800/30 transition-colors" onClick={() => setExpanded(!expanded)}>
                 <div className="flex justify-between items-start gap-4">
                     <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
+                        <div className="flex flex-wrap items-center gap-2 mb-2">
                             <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded ${
                                 query.is_resolved ? 'bg-green-900/30 text-green-400' : 'bg-yellow-900/30 text-yellow-500'
                             }`}>
                                 {query.is_resolved ? 'Resuelta' : 'Pendiente'}
                             </span>
                             {contextLabel && (
-                                <span className="text-xs text-indigo-400 bg-indigo-900/20 px-2 py-0.5 rounded border border-indigo-900/30">
+                                <span className="text-xs text-indigo-400 bg-indigo-900/20 px-2 py-0.5 rounded border border-indigo-900/30 whitespace-nowrap">
                                     {contextLabel}
                                 </span>
                             )}
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-gray-500 whitespace-nowrap">
                                 {formatDate(query.created_at)}
                             </span>
                         </div>

@@ -178,16 +178,16 @@ function AssignmentItem({
         <div className="bg-neutral-900 border border-neutral-800 rounded-lg overflow-hidden">
             <div 
                 onClick={onToggle}
-                className="p-4 flex items-center justify-between cursor-pointer hover:bg-neutral-800/50 transition-colors"
+                className="p-4 flex flex-col md:flex-row items-start md:items-center justify-between cursor-pointer hover:bg-neutral-800/50 transition-colors gap-3 md:gap-0"
             >
-                <div>
+                <div className="w-full md:w-auto">
                     <h3 className="text-lg font-bold text-gray-100">{assignment.title}</h3>
-                    <div className="flex gap-2 text-xs mt-1">
+                    <div className="flex flex-wrap gap-2 text-xs mt-1">
                         <span className="text-gray-500">Vence: {new Date(assignment.due_date).toLocaleString()}</span>
                         {isLate && !submission && <span className="text-red-500 font-bold">¡Vencido!</span>}
                     </div>
                 </div>
-                <div className={`px-3 py-1 rounded text-xs border ${statusColor}`}>
+                <div className={`px-3 py-1 rounded text-xs border self-start md:self-auto ${statusColor}`}>
                     {status} {submission?.grade && `(${submission.grade})`}
                 </div>
             </div>
