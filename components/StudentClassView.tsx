@@ -63,7 +63,6 @@ export default function StudentClassView({ courseId, classes, sprints = [] }: St
     return (
         <div className="space-y-6">
             {classes.map((cls) => {
-                const sprintTitle = getSprintTitle(cls.sprint_id)
                 const isExpanded = expandedClasses[cls.id]
 
                 return (
@@ -74,14 +73,6 @@ export default function StudentClassView({ courseId, classes, sprints = [] }: St
                         >
                             <div className="flex-1 min-w-0">
                                 <div className="flex flex-wrap items-center gap-2 mb-2">
-                                    <span className="text-xs font-medium text-indigo-400 bg-indigo-900/30 px-2 py-1 rounded">
-                                        Clase
-                                    </span>
-                                    {sprintTitle && (
-                                        <span className="text-xs font-medium text-indigo-300 bg-indigo-900/50 px-2 py-1 rounded border border-indigo-800">
-                                            {sprintTitle}
-                                        </span>
-                                    )}
                                     <span className="text-xs text-gray-500 whitespace-nowrap">
                                         {formatDate(cls.date)}
                                     </span>
@@ -98,14 +89,14 @@ export default function StudentClassView({ courseId, classes, sprints = [] }: St
                         </div>
                         
                         {isExpanded && (
-                            <div className={`px-6 pb-6 animate-in fade-in slide-in-from-top-2 duration-200 ${cls.description && cls.description.trim() !== '' ? 'border-t border-neutral-800 pt-6' : ''}`}>
+                            <div className="px-6 pb-6 animate-in fade-in slide-in-from-top-2 duration-200">
                                 {cls.description && cls.description.trim() !== '' && (
                                     <div className="prose prose-invert max-w-none mb-6 text-gray-400 text-sm">
                                         <p className="whitespace-pre-wrap">{cls.description}</p>
                                     </div>
                                 )}
 
-                                <StudentResourceList classId={cls.id} compact={!cls.description || cls.description.trim() === ''} />
+                                <StudentResourceList classId={cls.id} compact={true} hideTitle={true} />
                             </div>
                         )}
                     </div>

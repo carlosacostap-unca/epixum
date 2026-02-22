@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { getSprints } from '@/app/actions/sprints'
 import StudentClassView from './StudentClassView'
+import StudentAssignmentList from './StudentAssignmentList'
 
 type Sprint = {
     id: string
@@ -20,17 +21,40 @@ interface ClassItem {
     sprint_id?: string | null
 }
 
+interface Assignment {
+    id: string
+    title: string
+    description: string
+    due_date: string
+    sprint_id?: string | null
+}
+
+interface Submission {
+    id: string
+    assignment_id: string
+    content: string
+    file_url: string
+    grade: string
+    feedback: string
+    submitted_at: string
+}
+
 export default function SprintList({ 
     courseId, 
     initialSprints = [], 
-    classes = [] 
+    classes = [],
+    assignments = [],
+    initialSubmissions = []
 }: { 
     courseId: string, 
     initialSprints?: Sprint[],
-    classes?: ClassItem[]
+    classes?: ClassItem[],
+    assignments?: Assignment[],
+    initialSubmissions?: Submission[]
 }) {
     const [sprints, setSprints] = useState<Sprint[]>(initialSprints)
     const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null)
+    const [activeTab, setActiveTab] = useState<'classes' | 'assignments'>('classes')
     const [isLoading, setIsLoading] = useState(false)
 
     useEffect(() => {
@@ -59,6 +83,7 @@ export default function SprintList({
 
     const selectedSprint = sprints.find(s => s.id === selectedSprintId)
     const filteredClasses = selectedSprint ? classes.filter(c => c.sprint_id === selectedSprint.id) : []
+    const filteredAssignments = selectedSprint ? assignments.filter(a => a.sprint_id === selectedSprint.id) : []
 
     // Format dates for display (YYYY-MM-DD -> DD/MM/YYYY)
     const formatDate = (dateStr: string) => {
@@ -69,7 +94,6 @@ export default function SprintList({
 
     return (
         <div className="w-full">
-            <h2 className="text-xl font-bold text-gray-100 mb-6">Sprints</h2>
             
             {sprints.length === 0 ? (
                 <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-8 text-center">
@@ -98,13 +122,16 @@ export default function SprintList({
                             <button
                                 key={sprint.id}
                                 onClick={() => setSelectedSprintId(sprint.id)}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                                className={`px-4 py-3 rounded-lg text-sm font-medium whitespace-nowrap transition-colors flex flex-col items-start gap-1 min-w-[140px] ${
                                     selectedSprintId === sprint.id
                                         ? 'bg-indigo-600 text-white'
                                         : 'bg-neutral-900 text-gray-400 hover:text-gray-200 hover:bg-neutral-800'
                                 }`}
                             >
-                                {sprint.title}
+                                <span className="font-bold text-base">{sprint.title}</span>
+                                <span className={`text-xs ${selectedSprintId === sprint.id ? 'text-indigo-200' : 'text-gray-500'}`}>
+                                    {formatDate(sprint.start_date)} - {formatDate(sprint.end_date)}
+                                </span>
                             </button>
                         ))}
                     </div>
@@ -112,34 +139,59 @@ export default function SprintList({
                     {/* Selected Sprint Content */}
                     {selectedSprint && (
                         <div className="space-y-6">
-                            <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-4 md:p-6">
-                                <h3 className="text-xl md:text-2xl font-bold text-white mb-2">{selectedSprint.title}</h3>
-                                {selectedSprint.description && (
-                                    <p className="text-gray-400 mb-4 text-sm md:text-base">{selectedSprint.description}</p>
-                                )}
-                                
-                                <div className="flex flex-col sm:flex-row gap-3 sm:gap-6 text-sm text-gray-500 font-mono bg-black/20 p-3 rounded-md border border-neutral-800/50 w-full sm:w-auto">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
-                                        <span>Inicio: {formatDate(selectedSprint.start_date)}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
-                                        <span>Fin: {formatDate(selectedSprint.end_date)}</span>
-                                    </div>
-                                </div>
+                            {/* Sub Tabs */}
+                            <div className="flex border-b border-neutral-800">
+                                <button
+                                    onClick={() => setActiveTab('classes')}
+                                    className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                                        activeTab === 'classes' 
+                                            ? 'border-indigo-500 text-indigo-400' 
+                                            : 'border-transparent text-gray-400 hover:text-gray-200'
+                                    }`}
+                                >
+                                    Clases
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('assignments')}
+                                    className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                                        activeTab === 'assignments' 
+                                            ? 'border-indigo-500 text-indigo-400' 
+                                            : 'border-transparent text-gray-400 hover:text-gray-200'
+                                    }`}
+                                >
+                                    Trabajos Prácticos
+                                </button>
                             </div>
 
-                            <div className="pt-4">
-                                <h4 className="text-lg font-semibold text-gray-200 mb-4">Clases y Recursos</h4>
-                                {filteredClasses.length > 0 ? (
-                                    <StudentClassView courseId={courseId} classes={filteredClasses} sprints={sprints} />
-                                ) : (
-                                    <div className="text-center py-12 text-gray-500 bg-neutral-900/50 rounded-lg border border-neutral-800/50">
-                                        No hay clases publicadas en este sprint.
-                                    </div>
-                                )}
-                            </div>
+                            {/* Tab Content */}
+                            {activeTab === 'classes' && (
+                                <div className="pt-2">
+                                    {filteredClasses.length > 0 ? (
+                                        <StudentClassView courseId={courseId} classes={filteredClasses} sprints={sprints} />
+                                    ) : (
+                                        <div className="text-center py-12 text-gray-500 bg-neutral-900/50 rounded-lg border border-neutral-800/50">
+                                            No hay clases publicadas en este sprint.
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {activeTab === 'assignments' && (
+                                <div className="pt-2">
+                                    {filteredAssignments.length > 0 ? (
+                                        <StudentAssignmentList 
+                                            courseId={courseId} 
+                                            assignments={filteredAssignments} 
+                                            initialSubmissions={initialSubmissions}
+                                            hasSprints={true}
+                                        />
+                                    ) : (
+                                        <div className="text-center py-12 text-gray-500 bg-neutral-900/50 rounded-lg border border-neutral-800/50">
+                                            No hay trabajos prácticos asignados en este sprint.
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     )}
                 </>

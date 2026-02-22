@@ -166,7 +166,7 @@ export async function getCourseStudentsForTeacher(courseId: string) {
         
         const { data: profiles } = await supabase
             .from('profiles')
-            .select('email, first_name, last_name')
+            .select('email, first_name, last_name, dni, phone, birth_date, avatar_url')
             .in('email', emails)
             
         const studentsWithProfiles = enrollments.map(e => {
@@ -174,7 +174,11 @@ export async function getCourseStudentsForTeacher(courseId: string) {
             return {
                 ...e,
                 first_name: profile?.first_name,
-                last_name: profile?.last_name
+                last_name: profile?.last_name,
+                dni: profile?.dni,
+                phone: profile?.phone,
+                birth_date: profile?.birth_date,
+                avatar_url: profile?.avatar_url
             }
         })
 
@@ -278,12 +282,25 @@ export async function getCourseStudentStats(courseId: string) {
         // 1. Get Students
         const { data: students, error: studentsError } = await supabase
             .from('course_enrollments')
-            .select('email, created_at')
+            .select('email, created_at, team_id')
             .eq('course_id', courseId)
             .in('role', ['estudiante', 'alumno'])
             .order('email')
 
         if (studentsError) throw studentsError
+
+        // Get Profiles
+        const emails = students.map(s => s.email)
+        const { data: profiles } = await supabase
+            .from('profiles')
+            .select('email, first_name, last_name, dni, phone, birth_date, avatar_url')
+            .in('email', emails)
+
+        // Get Teams
+        const { data: teams } = await supabase
+            .from('teams')
+            .select('id, name')
+            .eq('course_id', courseId)
 
         // 2. Get Assignments IDs
         const { data: assignments, error: assignmentsError } = await supabase
@@ -312,6 +329,8 @@ export async function getCourseStudentStats(courseId: string) {
         const stats = students.map(student => {
             const studentSubmissions = submissions.filter(s => s.student_email === student.email)
             const submittedCount = studentSubmissions.length
+            const profile = profiles?.find(p => p.email === student.email)
+            const team = teams?.find(t => t.id === student.team_id)
             
             // Logic for "Approved"
             const approvedCount = studentSubmissions.filter(s => {
@@ -340,6 +359,13 @@ export async function getCourseStudentStats(courseId: string) {
 
             return {
                 email: student.email,
+                first_name: profile?.first_name,
+                last_name: profile?.last_name,
+                dni: profile?.dni,
+                phone: profile?.phone,
+                birth_date: profile?.birth_date,
+                avatar_url: profile?.avatar_url,
+                team_name: team?.name,
                 joined_at: student.created_at,
                 totalAssignments,
                 submitted: submittedCount,
@@ -1013,7 +1039,7 @@ export async function getCourseStudentsForNodocente(courseId: string) {
         // 1. Get enrollments
         const { data: enrollments, error: enrollError } = await supabase
             .from('course_enrollments')
-            .select('email, created_at')
+            .select('email, created_at, team_id')
             .eq('course_id', courseId)
             .eq('role', 'estudiante')
             
@@ -1069,6 +1095,7 @@ export async function getCourseStudentsForNodocente(courseId: string) {
                 id: profile?.id || email,
                 email,
                 created_at: enrollment.created_at,
+                team_id: enrollment.team_id,
                 first_name: profile?.first_name || '',
                 last_name: profile?.last_name || '',
                 dni: profile?.dni || '',

@@ -2,6 +2,8 @@
 
 import TeamChat from './TeamChat'
 
+import Link from 'next/link'
+
 interface ProgressItem {
     assignment_id: string
     assignment_title: string
@@ -11,9 +13,11 @@ interface ProgressItem {
 }
 
 interface Member {
+    id: string
     email: string
     first_name?: string
     last_name?: string
+    avatar_url?: string
     progress?: ProgressItem[]
 }
 
@@ -24,11 +28,12 @@ interface Team {
 }
 
 interface StudentTeamViewProps {
+    courseId: string
     team: Team | null
     currentUserEmail: string
 }
 
-export default function StudentTeamView({ team, currentUserEmail }: StudentTeamViewProps) {
+export default function StudentTeamView({ courseId, team, currentUserEmail }: StudentTeamViewProps) {
     if (!team) {
         return (
             <div className="bg-neutral-900 rounded-lg p-8 border border-neutral-800 text-center">
@@ -53,12 +58,23 @@ export default function StudentTeamView({ team, currentUserEmail }: StudentTeamV
 
             {/* Members Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {team.members.map((member) => (
-                    <div key={member.email} className="bg-neutral-900 rounded-lg border border-neutral-800 overflow-hidden flex flex-col h-full">
-                        {/* Member Header */}
-                        <div className="p-4 bg-neutral-800/50 border-b border-neutral-800 flex items-center gap-4">
-                            <div className="h-12 w-12 rounded-full bg-indigo-900/50 flex items-center justify-center text-indigo-300 font-bold border border-indigo-500/30 text-lg flex-shrink-0">
-                                {(member.first_name?.[0] || member.email[0]).toUpperCase()}
+                {[...team.members].sort((a, b) => {
+                    if (a.email === currentUserEmail) return -1
+                    if (b.email === currentUserEmail) return 1
+                    return 0
+                }).map((member) => (
+                    <Link 
+                        key={member.id || member.email} 
+                        href={`/student/courses/${courseId}/team/${member.id}`}
+                        className="block h-full transition-transform hover:scale-[1.02]"
+                    >
+                        <div className="bg-neutral-900 rounded-lg border border-neutral-800 overflow-hidden flex items-center p-6 gap-4 hover:border-indigo-500/50 transition-colors h-full cursor-pointer">
+                            <div className="h-16 w-16 rounded-full bg-indigo-900/50 flex items-center justify-center text-indigo-300 font-bold border border-indigo-500/30 text-2xl flex-shrink-0 overflow-hidden">
+                                {member.avatar_url ? (
+                                    <img src={member.avatar_url} alt={member.first_name || ''} className="h-full w-full object-cover" />
+                                ) : (
+                                    (member.first_name?.[0] || member.email[0]).toUpperCase()
+                                )}
                             </div>
                             <div className="overflow-hidden">
                                 <h4 className="font-bold text-gray-200 truncate text-lg">
@@ -67,42 +83,15 @@ export default function StudentTeamView({ team, currentUserEmail }: StudentTeamV
                                         : member.email.split('@')[0]
                                     }
                                 </h4>
-                                <p className="text-xs text-gray-500 truncate">{member.email}</p>
                             </div>
                         </div>
-
-                        {/* Progress Section */}
-                        <div className="p-4 flex-1">
-                            <h5 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Progreso Académico</h5>
-                            <div className="space-y-2">
-                                {member.progress && member.progress.length > 0 ? (
-                                    member.progress.map((item) => (
-                                        <div key={item.assignment_id} className="flex justify-between items-center text-sm">
-                                            <span className="text-gray-300 truncate pr-2 flex-1" title={item.assignment_title}>
-                                                {item.assignment_title}
-                                            </span>
-                                            <span className={`px-2 py-0.5 rounded text-[10px] font-medium border whitespace-nowrap ${
-                                                item.status === 'Calificado' 
-                                                    ? 'bg-green-900/30 text-green-400 border-green-900'
-                                                    : item.status === 'Entregado'
-                                                        ? 'bg-indigo-900/30 text-indigo-400 border-indigo-900'
-                                                        : 'bg-neutral-800 text-gray-500 border-neutral-700'
-                                            }`}>
-                                                {item.status} {item.grade && `(${item.grade})`}
-                                            </span>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <p className="text-gray-600 text-xs italic">Sin trabajos asignados</p>
-                                )}
-                            </div>
-                        </div>
-                    </div>
+                    </Link>
                 ))}
             </div>
-
+            
             {/* Chat Section */}
-            <div className="w-full">
+            <div className="mt-8">
+                <h3 className="text-xl font-bold text-gray-200 mb-4">Chat del Equipo</h3>
                 <TeamChat teamId={team.id} currentUserEmail={currentUserEmail} />
             </div>
         </div>

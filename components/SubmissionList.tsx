@@ -17,9 +17,10 @@ interface Submission {
 interface SubmissionListProps {
     assignmentId: string
     courseId: string
+    hasSprints: boolean
 }
 
-export default function SubmissionList({ assignmentId, courseId }: SubmissionListProps) {
+export default function SubmissionList({ assignmentId, courseId, hasSprints }: SubmissionListProps) {
     const [submissions, setSubmissions] = useState<Submission[]>([])
     const [loading, setLoading] = useState(true)
     const [editingId, setEditingId] = useState<string | null>(null) // For grading
@@ -135,8 +136,8 @@ export default function SubmissionList({ assignmentId, courseId }: SubmissionLis
                         <th className="p-3">Alumno</th>
                         <th className="p-3">Fecha</th>
                         <th className="p-3">Entrega</th>
-                        <th className="p-3">Calificación</th>
-                        <th className="p-3">Acciones</th>
+                        {!hasSprints && <th className="p-3">Calificación</th>}
+                        {!hasSprints && <th className="p-3">Acciones</th>}
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-800">
@@ -171,7 +172,7 @@ export default function SubmissionList({ assignmentId, courseId }: SubmissionLis
                                             rel="noopener noreferrer"
                                             className="text-indigo-400 hover:underline"
                                         >
-                                            Ver Archivo
+                                            {hasSprints ? 'Ver Repositorio' : 'Ver Archivo'}
                                         </a>
                                     ) : (
                                         <span className="truncate max-w-xs block" title={sub.content}>
@@ -180,7 +181,7 @@ export default function SubmissionList({ assignmentId, courseId }: SubmissionLis
                                     )
                                 )}
                             </td>
-                            <td className="p-3">
+                            {!hasSprints && <td className="p-3">
                                 {editingId === sub.id ? (
                                     <input 
                                         type="text" 
@@ -196,8 +197,8 @@ export default function SubmissionList({ assignmentId, courseId }: SubmissionLis
                                         <span className="text-gray-600 italic">Pendiente</span>
                                     )
                                 )}
-                            </td>
-                            <td className="p-3">
+                            </td>}
+                            {!hasSprints && <td className="p-3">
                                 <div className="flex flex-col gap-2">
                                     {/* Grade Actions */}
                                     {editingId === sub.id ? (
@@ -272,7 +273,7 @@ export default function SubmissionList({ assignmentId, courseId }: SubmissionLis
                                         </>
                                     )}
                                 </div>
-                            </td>
+                            </td>}
                         </tr>
                     ))}
                 </tbody>

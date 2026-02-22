@@ -13,7 +13,13 @@ type Team = {
 
 type Student = {
     email: string
+    first_name?: string
+    last_name?: string
     team_id: string | null
+    dni?: string
+    phone?: string
+    birth_date?: string
+    avatar_url?: string
 }
 
 export default function TeamManagement({ 
@@ -33,6 +39,7 @@ export default function TeamManagement({
     const [isLoading, setIsLoading] = useState(false)
     const [isAddingMember, setIsAddingMember] = useState<string | null>(null) // teamId
     const [selectedTeamForChat, setSelectedTeamForChat] = useState<Team | null>(null)
+    const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
 
     useEffect(() => {
         if (initialTeams.length === 0 || initialStudents.length === 0) {
@@ -205,7 +212,14 @@ export default function TeamManagement({
                                     <ul className="space-y-2">
                                         {members.map(member => (
                                             <li key={member.email} className="flex justify-between items-center bg-neutral-950 p-2 rounded border border-neutral-800">
-                                                <span className="text-sm text-gray-300">{member.email}</span>
+                                                <span 
+                                                    className="text-sm font-medium text-gray-200 cursor-pointer hover:text-indigo-400 transition-colors"
+                                                    onClick={() => setSelectedStudent(member)}
+                                                >
+                                                    {member.first_name || member.last_name 
+                                                        ? `${member.last_name || ''}, ${member.first_name || ''}`.trim().replace(/^, /, '').replace(/, $/, '')
+                                                        : member.email}
+                                                </span>
                                                 <button 
                                                     onClick={() => handleRemoveMember(member.email)}
                                                     className="text-gray-600 hover:text-red-400"
@@ -233,7 +247,11 @@ export default function TeamManagement({
                                         >
                                             <option value="" disabled>Seleccionar estudiante...</option>
                                             {unassignedStudents.map(s => (
-                                                <option key={s.email} value={s.email}>{s.email}</option>
+                                                <option key={s.email} value={s.email}>
+                                                    {s.first_name || s.last_name 
+                                                        ? `${s.last_name || ''}, ${s.first_name || ''} (${s.email})`
+                                                        : s.email}
+                                                </option>
                                             ))}
                                         </select>
                                         <button 
@@ -260,6 +278,67 @@ export default function TeamManagement({
             {teams.length === 0 && !isCreating && (
                 <div className="text-center py-12 text-gray-500 bg-neutral-900/50 rounded-lg border border-neutral-800 border-dashed">
                     No hay equipos creados aún.
+                </div>
+            )}
+
+            {selectedStudent && (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm" onClick={() => setSelectedStudent(null)}>
+                    <div className="bg-neutral-900 border border-neutral-800 rounded-lg w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                        <div className="p-4 border-b border-neutral-800 flex justify-between items-center bg-neutral-900">
+                            <h3 className="font-bold text-gray-100">Detalles del Estudiante</h3>
+                            <button onClick={() => setSelectedStudent(null)} className="text-gray-500 hover:text-white transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div className="flex items-center gap-4 mb-4">
+                                <div className="w-16 h-16 rounded-full bg-neutral-800 flex items-center justify-center overflow-hidden border border-neutral-700 shrink-0">
+                                    {selectedStudent.avatar_url ? (
+                                        <img src={selectedStudent.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <span className="text-2xl font-bold text-gray-500">
+                                            {(selectedStudent.first_name?.[0] || selectedStudent.email[0]).toUpperCase()}
+                                        </span>
+                                    )}
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-white">
+                                        {selectedStudent.first_name} {selectedStudent.last_name}
+                                    </h2>
+                                    <p className="text-indigo-400 text-sm">{selectedStudent.email}</p>
+                                </div>
+                            </div>
+                            
+                            <div className="space-y-3">
+                                <div className="bg-neutral-950 p-3 rounded border border-neutral-800">
+                                    <label className="text-xs text-gray-500 block mb-1">DNI</label>
+                                    <p className="text-gray-200">{selectedStudent.dni || 'No registrado'}</p>
+                                </div>
+                                <div className="bg-neutral-950 p-3 rounded border border-neutral-800">
+                                    <label className="text-xs text-gray-500 block mb-1">Teléfono</label>
+                                    <p className="text-gray-200">{selectedStudent.phone || 'No registrado'}</p>
+                                </div>
+                                <div className="bg-neutral-950 p-3 rounded border border-neutral-800">
+                                    <label className="text-xs text-gray-500 block mb-1">Fecha de Nacimiento</label>
+                                    <p className="text-gray-200">
+                                        {selectedStudent.birth_date 
+                                            ? new Date(selectedStudent.birth_date).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
+                                            : 'No registrada'}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-4 border-t border-neutral-800 bg-neutral-900/50 flex justify-end">
+                            <button 
+                                onClick={() => setSelectedStudent(null)}
+                                className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded text-sm font-medium transition-colors"
+                            >
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

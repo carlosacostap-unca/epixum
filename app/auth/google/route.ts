@@ -76,6 +76,9 @@ export async function POST(request: Request) {
                       : ['estudiante'];
     
     console.log('[AUTH] Calculated userRoles:', userRoles);
+    
+    // Check if user is a teacher or admin to skip profile completion
+    const isTeacherOrAdmin = userRoles.some((r: string) => ['docente', 'admin-plataforma', 'admin-institucion'].includes(r));
 
     // Prioritize 'picture' from Google which is usually the raw URL, 
     // over 'avatar_url' which might be a Supabase processed one or Gravatar.
@@ -87,7 +90,7 @@ export async function POST(request: Request) {
         const profileData: any = {
             roles: userRoles,
             avatar_url: avatarUrl,
-            profile_completed: false, // Explicitly set to false for new users
+            profile_completed: isTeacherOrAdmin, // Skip completion for teachers/admins
             // Only include fields that actually exist in whitelist
             ...(whitelistedUser?.first_name && { first_name: whitelistedUser.first_name }),
             ...(whitelistedUser?.last_name && { last_name: whitelistedUser.last_name }),
@@ -107,11 +110,13 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'profile_creation_failed' }, { status: 500 })
         }
         
-        // Return redirect to complete profile for new users
-        return NextResponse.json({ 
-            success: true, 
-            redirectTo: '/complete-profile' 
-        })
+        // Return redirect to complete profile ONLY for new users who are NOT teachers/admins
+        if (!isTeacherOrAdmin) {
+            return NextResponse.json({ 
+                success: true, 
+                redirectTo: '/complete-profile' 
+            })
+        }
     } else {
             // IF PROFILE EXISTS: 
             // 1. Sync ROLES from whitelist.
@@ -153,7 +158,10 @@ export async function POST(request: Request) {
     }
 
     // Final check for redirect (in case existing user hasn't completed profile)
-    if (profile && !profile.profile_completed) {
+    // Only redirect if they are NOT a teacher/admin.
+    // Teachers/admins are assumed to be completed or allowed to bypass.
+    
+    if (profile && !profile.profile_completed && !isTeacherOrAdmin) {
         return NextResponse.json({ 
            success: true, 
            redirectTo: '/complete-profile' 

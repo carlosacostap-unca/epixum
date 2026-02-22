@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { enrollStudentByNodocente, removeStudentByNodocente, searchUsersForEnrollment, updateStudentProfileByNodocente } from '@/app/actions/courses'
+import TeamManagementDragDrop from '@/components/TeamManagementDragDrop'
 
 interface Student {
     id: string
@@ -16,6 +17,7 @@ interface Student {
     birth_date?: string
     avatar_url?: string
     is_verified?: boolean
+    team_id?: string | null
 }
 
 interface Course {
@@ -27,18 +29,21 @@ interface Course {
     instituciones: {
         nombre: string
     }
+    has_teams?: boolean
 }
 
 export default function NonTeachingStaffCourseView({ 
     course,
     students = [],
     teachers = [],
-    staff = []
+    staff = [],
+    teams = []
 }: { 
     course: Course
     students?: Student[]
     teachers?: any[]
     staff?: any[]
+    teams?: any[]
 }) {
     const [isPending, startTransition] = useTransition()
     const [showEnrollForm, setShowEnrollForm] = useState(false)
@@ -48,6 +53,7 @@ export default function NonTeachingStaffCourseView({
     const [isStudentsExpanded, setIsStudentsExpanded] = useState(true)
     const [isTeachersExpanded, setIsTeachersExpanded] = useState(false)
     const [isStaffExpanded, setIsStaffExpanded] = useState(false)
+    const [isTeamsExpanded, setIsTeamsExpanded] = useState(false)
     
     // Enrollment Flow States
     const [enrollmentStep, setEnrollmentStep] = useState<'search' | 'results' | 'form' | 'confirm'>('search')
@@ -923,6 +929,42 @@ export default function NonTeachingStaffCourseView({
                         </div>
                     )}
                 </div>
+                {/* TEAMS SECTION */}
+                {course.has_teams && (
+                    <div className="w-full bg-neutral-900 rounded-lg shadow-md border border-neutral-800 overflow-hidden">
+                        <button 
+                            onClick={() => setIsTeamsExpanded(!isTeamsExpanded)}
+                            className="w-full px-6 py-4 flex items-center justify-between bg-neutral-900 hover:bg-neutral-800/50 transition-colors"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-indigo-900/30 rounded-lg text-indigo-400">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                                </div>
+                                <h2 className="text-xl font-bold text-white">Gestión de Equipos</h2>
+                                <span className="bg-neutral-800 text-gray-400 text-xs px-2 py-1 rounded-full">{teams.length} Equipos</span>
+                            </div>
+                            <svg 
+                                className={`w-5 h-5 text-gray-500 transition-transform duration-200 ${isTeamsExpanded ? 'rotate-180' : ''}`} 
+                                fill="none" 
+                                stroke="currentColor" 
+                                viewBox="0 0 24 24"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        
+                        {isTeamsExpanded && (
+                            <div className="p-6 border-t border-neutral-800 animate-in fade-in slide-in-from-top-2">
+                                <TeamManagementDragDrop 
+                                    courseId={course.id} 
+                                    initialTeams={teams} 
+                                    initialStudents={students} 
+                                />
+                            </div>
+                        )}
+                    </div>
+                )}
+
             </main>
         </div>
     )

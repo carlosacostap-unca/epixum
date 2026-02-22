@@ -26,7 +26,10 @@ interface AssignmentManagementProps {
 
 export default function AssignmentManagement({ courseId, initialAssignments, sprints = [] }: AssignmentManagementProps) {
     const [assignments, setAssignments] = useState<Assignment[]>(initialAssignments)
-    const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null)
+    // If sprints exist, default to the first sprint. Otherwise, default to null (General).
+    const [selectedSprintId, setSelectedSprintId] = useState<string | null>(
+        sprints.length > 0 ? sprints[0].id : null
+    )
     const [isAdding, setIsAdding] = useState(false)
     const [loading, setLoading] = useState(false)
     const [expandedAssignmentId, setExpandedAssignmentId] = useState<string | null>(null)
@@ -46,12 +49,17 @@ export default function AssignmentManagement({ courseId, initialAssignments, spr
     const [editSprintId, setEditSprintId] = useState<string>('')
 
     useEffect(() => {
-        if (isAdding && selectedSprintId) {
-            setFormSprintId(selectedSprintId)
-        } else if (isAdding && !selectedSprintId) {
-            setFormSprintId('')
+        if (isAdding) {
+            if (selectedSprintId) {
+                setFormSprintId(selectedSprintId)
+            } else if (sprints.length > 0) {
+                // Fallback to first sprint if for some reason selectedSprintId is null but sprints exist
+                setFormSprintId(sprints[0].id)
+            } else {
+                setFormSprintId('')
+            }
         }
-    }, [isAdding, selectedSprintId])
+    }, [isAdding, selectedSprintId, sprints])
 
     const filteredAssignments = selectedSprintId 
         ? assignments.filter(a => a.sprint_id === selectedSprintId)
@@ -168,16 +176,7 @@ export default function AssignmentManagement({ courseId, initialAssignments, spr
             {/* Sprint Tabs */}
             {sprints.length > 0 && (
                 <div className="flex gap-2 overflow-x-auto pb-4 border-b border-neutral-800 scrollbar-thin scrollbar-thumb-neutral-700">
-                    <button
-                        onClick={() => setSelectedSprintId(null)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                            selectedSprintId === null
-                                ? 'bg-indigo-600 text-white'
-                                : 'bg-neutral-900 text-gray-400 hover:text-gray-200 hover:bg-neutral-800'
-                        }`}
-                    >
-                        General
-                    </button>
+                    {/* General tab removed for sprint-based courses as requested */}
                     {sprints.map(sprint => (
                         <button
                             key={sprint.id}
@@ -219,13 +218,13 @@ export default function AssignmentManagement({ courseId, initialAssignments, spr
                             </div>
                             {sprints.length > 0 && (
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-400 mb-1">Sprint (Opcional)</label>
+                                    <label className="block text-sm font-medium text-gray-400 mb-1">Sprint</label>
                                     <select
                                         value={formSprintId}
                                         onChange={(e) => setFormSprintId(e.target.value)}
                                         className="w-full bg-black border border-neutral-700 rounded p-2 text-gray-100 focus:border-indigo-500 focus:outline-none"
                                     >
-                                        <option value="">General (Sin Sprint)</option>
+                                        {/* General option removed for sprint-based courses */}
                                         {sprints.map(sprint => (
                                             <option key={sprint.id} value={sprint.id}>
                                                 {sprint.title}
@@ -300,13 +299,13 @@ export default function AssignmentManagement({ courseId, initialAssignments, spr
                                         </div>
                                         {sprints.length > 0 && (
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-400 mb-1">Sprint (Opcional)</label>
+                                                <label className="block text-sm font-medium text-gray-400 mb-1">Sprint</label>
                                                 <select
-                                                    value={editSprintId}
+                                                    value={editSprintId || (sprints.length > 0 ? sprints[0].id : '')}
                                                     onChange={(e) => setEditSprintId(e.target.value)}
                                                     className="w-full bg-black border border-neutral-700 rounded p-2 text-gray-100 focus:border-indigo-500 focus:outline-none"
                                                 >
-                                                    <option value="">General (Sin Sprint)</option>
+                                                    {/* General option removed for sprint-based courses */}
                                                     {sprints.map(sprint => (
                                                         <option key={sprint.id} value={sprint.id}>
                                                             {sprint.title}
@@ -404,6 +403,7 @@ export default function AssignmentManagement({ courseId, initialAssignments, spr
                                 <SubmissionList 
                                     assignmentId={item.id} 
                                     courseId={courseId}
+                                    hasSprints={sprints.length > 0}
                                 />
                             )}
                         </div>

@@ -87,8 +87,15 @@ export default function TeamChat({ teamId, currentUserEmail }: { teamId: string,
 
         const result = await sendMessage(teamId, content)
         if (result.success && result.data) {
-            // Replace optimistic message with real one
-            setMessages(prev => prev.map(m => m.id === tempId ? (result.data as Message) : m))
+            const realMessage = result.data as Message
+            setMessages(prev => {
+                // If the message arrived via Realtime already, just remove the optimistic one
+                if (prev.some(m => m.id === realMessage.id)) {
+                    return prev.filter(m => m.id !== tempId)
+                }
+                // Otherwise, replace optimistic with real
+                return prev.map(m => m.id === tempId ? realMessage : m)
+            })
         } else {
             // Error handling
             setMessages(prev => prev.filter(m => m.id !== tempId)) // Remove optimistic msg

@@ -13,6 +13,7 @@ interface Resource {
 interface StudentResourceListProps {
     classId: string
     compact?: boolean
+    hideTitle?: boolean
 }
 
 const resourceTypeLabels: Record<string, string> = {
@@ -22,7 +23,7 @@ const resourceTypeLabels: Record<string, string> = {
     doc: 'ARCHIVO'
 }
 
-export default function StudentResourceList({ classId, compact = false }: StudentResourceListProps) {
+export default function StudentResourceList({ classId, compact = false, hideTitle = false }: StudentResourceListProps) {
     const [resources, setResources] = useState<Resource[]>([])
     const [loading, setLoading] = useState(true)
 
@@ -38,15 +39,15 @@ export default function StudentResourceList({ classId, compact = false }: Studen
         setLoading(false)
     }
 
-    if (loading) return <div className="text-xs text-gray-500">Cargando recursos...</div>
+    if (loading) return null
 
     if (resources.length === 0) {
-        return <p className="text-xs text-gray-600 italic mt-2">No hay recursos disponibles.</p>
+        return null
     }
 
     return (
-        <div className={`${compact ? 'pt-4' : 'mt-4 pt-4'} border-t border-neutral-800`}>
-            <h4 className="text-sm font-semibold text-gray-300 mb-3">Recursos ({resources.length})</h4>
+        <div className={`${compact ? 'pt-0' : 'mt-4 pt-4'} ${hideTitle ? '' : 'border-t border-neutral-800'}`}>
+            {!hideTitle && <h4 className="text-sm font-semibold text-gray-300 mb-3">Recursos ({resources.length})</h4>}
             <div className="space-y-2">
                 {resources.map(res => (
                     <div key={res.id} className="flex justify-between items-center group/res bg-black/30 p-2 rounded hover:bg-black/50 transition-colors">

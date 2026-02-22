@@ -21,17 +21,17 @@ async function checkTeacherAccess(courseId: string) {
         }
     )
 
-    // Check if user is enrolled as docente in this course using Admin Client
+    // Check if user is enrolled as docente or nodocente in this course using Admin Client
     const { data: enrollment, error } = await adminClient
         .from('course_enrollments')
         .select('role')
         .eq('course_id', courseId)
         .eq('email', user.email)
-        .eq('role', 'docente')
+        .in('role', ['docente', 'nodocente'])
         .single()
 
     if (error || !enrollment) {
-        throw new Error('No autorizado: No es docente de este curso')
+        throw new Error('No autorizado: No es docente ni nodocente de este curso')
     }
     
     return { supabase: adminClient, user }
@@ -87,13 +87,13 @@ export async function getSprints(courseId: string) {
                 }
             )
 
-            // Check if teacher
+            // Check if teacher or nodocente
             const { data: teacherEnrollment } = await adminClient
                 .from('course_enrollments')
                 .select('id')
                 .eq('course_id', courseId)
                 .eq('email', user.email)
-                .eq('role', 'docente')
+                .in('role', ['docente', 'nodocente'])
                 .single()
 
             if (teacherEnrollment) {
