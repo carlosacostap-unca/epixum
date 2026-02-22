@@ -81,10 +81,6 @@ export default async function TeamMemberPage(props: { params: Promise<{ courseId
                         <h2 className="text-3xl font-bold text-white mb-2">
                             {profile.first_name} {profile.last_name}
                         </h2>
-                        <div className="flex flex-col gap-1 mb-4 text-gray-400">
-                            <p>{profile.email}</p>
-                            {profile.phone && <p>{profile.phone}</p>}
-                        </div>
                         
                         <div className={`grid grid-cols-1 ${!has_sprints ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-4 mt-6`}>
                             <div className="bg-neutral-800/50 p-4 rounded-lg border border-neutral-800">

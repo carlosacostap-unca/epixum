@@ -82,6 +82,9 @@ export default function StudentTeamView({ courseId, team, currentUserEmail }: St
                                         ? `${member.first_name} ${member.last_name}`
                                         : member.email.split('@')[0]
                                     }
+                                    {member.email === currentUserEmail && (
+                                        <span className="ml-2 text-sm font-normal text-gray-500">(Tú)</span>
+                                    )}
                                 </h4>
                             </div>
                         </div>

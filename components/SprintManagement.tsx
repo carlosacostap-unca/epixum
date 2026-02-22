@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createSprint, getSprints, deleteSprint } from '@/app/actions/sprints'
+import { createSprint, getSprints, deleteSprint, updateSprint } from '@/app/actions/sprints'
 import { createClass, deleteClass } from '@/app/actions/classes'
 import ResourceList from './ResourceList'
 
@@ -34,6 +34,7 @@ export default function SprintManagement({
     const [classes, setClasses] = useState<ClassItem[]>(initialClasses)
     const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null)
     const [isCreating, setIsCreating] = useState(false)
+    const [isEditing, setIsEditing] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
 
     // Class creation state
@@ -78,6 +79,19 @@ export default function SprintManagement({
 
         if (result.success) {
             setIsCreating(false)
+            loadSprints() // Refresh list
+        } else {
+            alert(result.error)
+        }
+    }
+
+    async function handleUpdate(formData: FormData) {
+        setIsLoading(true)
+        const result = await updateSprint(formData)
+        setIsLoading(false)
+
+        if (result.success) {
+            setIsEditing(false)
             loadSprints() // Refresh list
         } else {
             alert(result.error)
@@ -145,7 +159,7 @@ export default function SprintManagement({
         <div className="w-full">
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-bold text-gray-100">Sprints</h2>
-                {!isCreating && (
+                {!isCreating && !isEditing && (
                     <button 
                         onClick={() => setIsCreating(true)}
                         className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
@@ -156,7 +170,7 @@ export default function SprintManagement({
             </div>
 
             {/* Sprint Tabs */}
-            {sprints.length > 0 && !isCreating && (
+            {sprints.length > 0 && !isCreating && !isEditing && (
                 <div className="flex gap-2 overflow-x-auto pb-4 mb-2 border-b border-neutral-800 scrollbar-thin scrollbar-thumb-neutral-700">
                     {sprints.map(sprint => (
                         <button
@@ -232,6 +246,78 @@ export default function SprintManagement({
                             <button 
                                 type="button"
                                 onClick={() => setIsCreating(false)}
+                                className="bg-neutral-700 hover:bg-neutral-600 text-gray-300 text-sm font-bold py-2 px-4 rounded"
+                            >
+                                Cancelar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+            {isEditing && selectedSprint && (
+                <div className="bg-neutral-900 border border-neutral-800 rounded-lg p-6 mb-6">
+                    <h3 className="text-lg font-bold text-gray-100 mb-4">Editar Sprint</h3>
+                    <form action={handleUpdate} className="flex flex-col gap-4">
+                        <input type="hidden" name="courseId" value={courseId} />
+                        <input type="hidden" name="sprintId" value={selectedSprint.id} />
+                        
+                        <div>
+                            <label className="block text-xs text-gray-500 mb-1">Título</label>
+                            <input 
+                                name="title"
+                                defaultValue={selectedSprint.title}
+                                placeholder="Ej: Sprint 1 - Fundamentos"
+                                className="bg-neutral-950 border border-neutral-700 rounded px-3 py-2 text-sm text-white w-full focus:outline-none focus:border-indigo-500"
+                                required
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-xs text-gray-500 mb-1">Descripción</label>
+                            <textarea 
+                                name="description"
+                                defaultValue={selectedSprint.description || ''}
+                                placeholder="Objetivos y alcance del sprint..."
+                                className="bg-neutral-950 border border-neutral-700 rounded px-3 py-2 text-sm text-white w-full focus:outline-none focus:border-indigo-500 resize-none"
+                                rows={3}
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">Fecha Inicio</label>
+                                <input 
+                                    type="date"
+                                    name="startDate"
+                                    defaultValue={selectedSprint.start_date}
+                                    className="bg-neutral-950 border border-neutral-700 rounded px-3 py-2 text-sm text-white w-full focus:outline-none focus:border-indigo-500"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs text-gray-500 mb-1">Fecha Fin</label>
+                                <input 
+                                    type="date"
+                                    name="endDate"
+                                    defaultValue={selectedSprint.end_date}
+                                    className="bg-neutral-950 border border-neutral-700 rounded px-3 py-2 text-sm text-white w-full focus:outline-none focus:border-indigo-500"
+                                    required
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex gap-2 mt-2">
+                            <button 
+                                type="submit"
+                                disabled={isLoading}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold py-2 px-4 rounded disabled:opacity-50"
+                            >
+                                {isLoading ? 'Guardando...' : 'Guardar Cambios'}
+                            </button>
+                            <button 
+                                type="button" 
+                                onClick={() => setIsEditing(false)}
                                 className="bg-neutral-700 hover:bg-neutral-600 text-gray-300 text-sm font-bold py-2 px-4 rounded"
                             >
                                 Cancelar
@@ -332,6 +418,15 @@ export default function SprintManagement({
                                     className="text-indigo-400 hover:text-indigo-300 text-sm px-3 py-1 bg-indigo-900/20 hover:bg-indigo-900/40 rounded transition-colors"
                                 >
                                     + Agregar Clase
+                                </button>
+                                <button 
+                                    onClick={() => setIsEditing(true)}
+                                    className="text-gray-500 hover:text-indigo-400 p-2 rounded hover:bg-neutral-800 transition-colors"
+                                    title="Editar Sprint"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                                    </svg>
                                 </button>
                                 <button 
                                     onClick={() => handleDelete(selectedSprint.id)}

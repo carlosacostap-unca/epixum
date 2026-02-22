@@ -213,9 +213,42 @@ export async function submitAssignment(assignmentId: string, content: string, fi
 
 export async function getAssignmentResources(assignmentId: string) {
     try {
-        const { supabase } = await checkAuth()
+        const { user } = await checkAuth()
+        const adminClient = getAdminClient()
         
-        const { data, error } = await supabase
+        // 1. Get assignment to check course
+        const { data: assignment, error: assignError } = await adminClient
+            .from('assignments')
+            .select('course_id')
+            .eq('id', assignmentId)
+            .single()
+
+        if (assignError || !assignment) throw new Error('Trabajo práctico no encontrado')
+
+        // 2. Check if user is enrolled in the course (or is admin/guest)
+        // Check guest first
+        const { data: profile } = await adminClient
+            .from('profiles')
+            .select('roles')
+            .eq('email', user.email!)
+            .single()
+        
+        const isGuest = profile?.roles?.includes('invitado')
+        
+        if (!isGuest) {
+            const { data: enrollments, error: enrollError } = await adminClient
+                .from('course_enrollments')
+                .select('role')
+                .eq('course_id', assignment.course_id)
+                .ilike('email', user.email!)
+
+            if (enrollError || !enrollments || enrollments.length === 0) {
+                 throw new Error('No tienes acceso a este curso')
+            }
+        }
+
+        // 3. Get resources
+        const { data, error } = await adminClient
             .from('assignment_resources')
             .select('*')
             .eq('assignment_id', assignmentId)

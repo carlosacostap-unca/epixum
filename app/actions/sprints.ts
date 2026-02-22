@@ -70,23 +70,58 @@ export async function createSprint(formData: FormData) {
     }
 }
 
+export async function updateSprint(formData: FormData) {
+    const sprintId = formData.get('sprintId') as string
+    const courseId = formData.get('courseId') as string
+    const title = formData.get('title') as string
+    const description = formData.get('description') as string
+    const startDate = formData.get('startDate') as string
+    const endDate = formData.get('endDate') as string
+
+    if (!sprintId || !courseId || !title || !startDate || !endDate) {
+        return { success: false, error: 'Faltan campos requeridos' }
+    }
+
+    try {
+        const { supabase } = await checkTeacherAccess(courseId)
+        
+        const { error } = await supabase
+            .from('sprints')
+            .update({
+                title,
+                description,
+                start_date: startDate,
+                end_date: endDate
+            })
+            .eq('id', sprintId)
+
+        if (error) throw error
+        
+        revalidatePath(`/teacher/courses/${courseId}`)
+        return { success: true }
+    } catch (error: unknown) {
+        return { success: false, error: (error as Error).message }
+    }
+}
+
 export async function getSprints(courseId: string) {
     try {
         const supabase = await createClient()
         const { data: { user } } = await supabase.auth.getUser()
+        
+        // Default admin client for privileged access if needed
+        const adminClient = createAdminClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!,
+            {
+                auth: {
+                    autoRefreshToken: false,
+                    persistSession: false
+                }
+            }
+        )
 
         if (user && user.email) {
-             const adminClient = createAdminClient(
-                process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                process.env.SUPABASE_SERVICE_ROLE_KEY!,
-                {
-                    auth: {
-                        autoRefreshToken: false,
-                        persistSession: false
-                    }
-                }
-            )
-
             // Check if teacher or nodocente
             const { data: teacherEnrollment } = await adminClient
                 .from('course_enrollments')

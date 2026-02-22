@@ -74,7 +74,6 @@ export default function TeacherStudentManagement({
                                 <tr>
                                     <th className="p-4">Estudiante</th>
                                     <th className="p-4 text-center">Entregados</th>
-                                    <th className="p-4 text-center">Aprobados</th>
                                     <th className="p-4 text-right">Progreso</th>
                                 </tr>
                             </thead>
@@ -128,15 +127,6 @@ export default function TeacherStudentManagement({
                                                             : 'bg-neutral-800 text-gray-500'
                                                 }`}>
                                                     {student.submitted} / {student.totalAssignments}
-                                                </span>
-                                            </td>
-                                            <td className="p-4 text-center">
-                                                <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-                                                    student.approved > 0 
-                                                        ? 'bg-indigo-900/30 text-indigo-400'
-                                                        : 'bg-neutral-800 text-gray-500'
-                                                }`}>
-                                                    {student.approved}
                                                 </span>
                                             </td>
                                             <td className="p-4 text-right">

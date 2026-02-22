@@ -72,7 +72,7 @@ export default function CourseQueriesTab({ courseId, classes, assignments, curre
     // Create form state
     const [isCreating, setIsCreating] = useState(false)
     const [newQueryContent, setNewQueryContent] = useState('')
-    const [newQueryType, setNewQueryType] = useState<'general' | 'class' | 'assignment'>('general')
+    const [newQueryType, setNewQueryType] = useState<'general' | 'class' | 'assignment'>('assignment')
     const [newQueryContextId, setNewQueryContextId] = useState<string>('')
 
     // Search state
@@ -341,9 +341,9 @@ export default function CourseQueriesTab({ courseId, classes, assignments, curre
                                     }}
                                     className="w-full bg-black border border-neutral-700 rounded p-2 text-gray-200 text-sm"
                                 >
-                                    <option value="general">General</option>
-                                    <option value="class">Clase</option>
                                     <option value="assignment">Trabajo Práctico</option>
+                                    <option value="class">Clase</option>
+                                    <option value="general">General</option>
                                 </select>
                             </div>
                             
