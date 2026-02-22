@@ -262,9 +262,44 @@ export async function getAssignmentResources(assignmentId: string) {
 
 export async function createAssignmentResource(assignmentId: string, title: string, url: string, type: string) {
     try {
-        const { supabase } = await checkAuth()
+        const { user } = await checkAuth()
+        const adminClient = getAdminClient()
+
+        // 1. Get assignment to find course
+        const { data: assignment, error: assignmentError } = await adminClient
+            .from('assignments')
+            .select('course_id')
+            .eq('id', assignmentId)
+            .single()
+
+        if (assignmentError || !assignment) throw new Error('Trabajo práctico no encontrado')
+
+        // 2. Check if user is a teacher in the course
+        const { data: enrollment, error: enrollmentError } = await adminClient
+            .from('course_enrollments')
+            .select('role')
+            .eq('course_id', assignment.course_id)
+            .ilike('email', user.email!)
+            .eq('role', 'docente')
+            .single()
+
+        if (enrollmentError || !enrollment) {
+            // Also allow admins
+            const { data: profile } = await adminClient
+                .from('profiles')
+                .select('roles')
+                .eq('email', user.email!)
+                .single()
+            
+            const isAdmin = profile?.roles?.some((r: string) => ['admin-plataforma', 'admin-institucion'].includes(r))
+            
+            if (!isAdmin) {
+                throw new Error('No tienes permisos para crear recursos en este curso')
+            }
+        }
         
-        const { data, error } = await supabase
+        // 3. Create resource
+        const { data, error } = await adminClient
             .from('assignment_resources')
             .insert({
                 assignment_id: assignmentId,
@@ -285,9 +320,53 @@ export async function createAssignmentResource(assignmentId: string, title: stri
 
 export async function updateAssignmentResource(id: string, title: string, url: string, type: string) {
     try {
-        const { supabase } = await checkAuth()
+        const { user } = await checkAuth()
+        const adminClient = getAdminClient()
         
-        const { error } = await supabase
+        // 1. Get resource to find assignment and course
+        const { data: resource, error: resourceError } = await adminClient
+            .from('assignment_resources')
+            .select('assignment_id')
+            .eq('id', id)
+            .single()
+
+        if (resourceError || !resource) throw new Error('Recurso no encontrado')
+
+        // 2. Get assignment to find course
+        const { data: assignment, error: assignmentError } = await adminClient
+            .from('assignments')
+            .select('course_id')
+            .eq('id', resource.assignment_id)
+            .single()
+
+        if (assignmentError || !assignment) throw new Error('Trabajo práctico asociado no encontrado')
+
+        // 3. Check if user is a teacher in the course
+        const { data: enrollment, error: enrollmentError } = await adminClient
+            .from('course_enrollments')
+            .select('role')
+            .eq('course_id', assignment.course_id)
+            .ilike('email', user.email!)
+            .eq('role', 'docente')
+            .single()
+
+        if (enrollmentError || !enrollment) {
+            // Also allow admins
+            const { data: profile } = await adminClient
+                .from('profiles')
+                .select('roles')
+                .eq('email', user.email!)
+                .single()
+            
+            const isAdmin = profile?.roles?.some((r: string) => ['admin-plataforma', 'admin-institucion'].includes(r))
+            
+            if (!isAdmin) {
+                throw new Error('No tienes permisos para editar recursos en este curso')
+            }
+        }
+        
+        // 4. Update resource
+        const { error } = await adminClient
             .from('assignment_resources')
             .update({
                 title,
@@ -306,9 +385,53 @@ export async function updateAssignmentResource(id: string, title: string, url: s
 
 export async function deleteAssignmentResource(id: string) {
     try {
-        const { supabase } = await checkAuth()
+        const { user } = await checkAuth()
+        const adminClient = getAdminClient()
+
+        // 1. Get resource to find assignment and course
+        const { data: resource, error: resourceError } = await adminClient
+            .from('assignment_resources')
+            .select('assignment_id')
+            .eq('id', id)
+            .single()
+
+        if (resourceError || !resource) throw new Error('Recurso no encontrado')
+
+        // 2. Get assignment to find course
+        const { data: assignment, error: assignmentError } = await adminClient
+            .from('assignments')
+            .select('course_id')
+            .eq('id', resource.assignment_id)
+            .single()
+
+        if (assignmentError || !assignment) throw new Error('Trabajo práctico asociado no encontrado')
+
+        // 3. Check if user is a teacher in the course
+        const { data: enrollment, error: enrollmentError } = await adminClient
+            .from('course_enrollments')
+            .select('role')
+            .eq('course_id', assignment.course_id)
+            .ilike('email', user.email!)
+            .eq('role', 'docente')
+            .single()
+
+        if (enrollmentError || !enrollment) {
+            // Also allow admins
+            const { data: profile } = await adminClient
+                .from('profiles')
+                .select('roles')
+                .eq('email', user.email!)
+                .single()
+            
+            const isAdmin = profile?.roles?.some((r: string) => ['admin-plataforma', 'admin-institucion'].includes(r))
+            
+            if (!isAdmin) {
+                throw new Error('No tienes permisos para eliminar recursos en este curso')
+            }
+        }
         
-        const { error } = await supabase
+        // 4. Delete resource
+        const { error } = await adminClient
             .from('assignment_resources')
             .delete()
             .eq('id', id)
