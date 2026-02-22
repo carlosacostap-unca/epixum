@@ -26,9 +26,45 @@ function getAdminClient() {
 
 export async function getClassResources(classId: string) {
     try {
-        const { supabase } = await checkAuth()
+        const { user } = await checkAuth()
+        const adminClient = getAdminClient()
 
-        const { data, error } = await supabase
+        // 1. Get class to check course
+        const { data: classData, error: classError } = await adminClient
+            .from('classes')
+            .select('course_id')
+            .eq('id', classId)
+            .single()
+
+        if (classError || !classData) {
+            throw new Error('Clase no encontrada')
+        }
+
+        // 2. Check permissions
+        // Check guest first
+        const { data: profile } = await adminClient
+            .from('profiles')
+            .select('roles')
+            .eq('email', user.email!)
+            .single()
+        
+        const isGuest = profile?.roles?.includes('invitado')
+        const isAdmin = profile?.roles?.some((r: string) => ['admin-plataforma', 'admin-institucion'].includes(r))
+        
+        if (!isGuest && !isAdmin) {
+            const { data: enrollments, error: enrollError } = await adminClient
+                .from('course_enrollments')
+                .select('role')
+                .eq('course_id', classData.course_id)
+                .ilike('email', user.email!)
+
+            if (enrollError || !enrollments || enrollments.length === 0) {
+                 throw new Error('No tienes acceso a este curso')
+            }
+        }
+
+        // 3. Get resources
+        const { data, error } = await adminClient
             .from('class_resources')
             .select('*')
             .eq('class_id', classId)
