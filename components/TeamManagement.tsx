@@ -124,7 +124,11 @@ export default function TeamManagement({
                             </button>
                         </div>
                         <div className="flex-1 overflow-hidden p-1">
-                            <TeamChat teamId={selectedTeamForChat.id} currentUserEmail={currentUserEmail} />
+                            <TeamChat 
+                                teamId={selectedTeamForChat.id} 
+                                currentUserEmail={currentUserEmail}
+                                members={students.filter(s => s.team_id === selectedTeamForChat.id)}
+                            />
                         </div>
                     </div>
                 </div>

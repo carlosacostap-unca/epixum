@@ -95,7 +95,11 @@ export default function StudentTeamView({ courseId, team, currentUserEmail }: St
             {/* Chat Section */}
             <div className="mt-8">
                 <h3 className="text-xl font-bold text-gray-200 mb-4">Chat del Equipo</h3>
-                <TeamChat teamId={team.id} currentUserEmail={currentUserEmail} />
+                <TeamChat 
+                    teamId={team.id} 
+                    currentUserEmail={currentUserEmail}
+                    members={team.members}
+                />
             </div>
         </div>
     )

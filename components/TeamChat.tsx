@@ -11,13 +11,35 @@ interface Message {
     created_at: string
 }
 
-export default function TeamChat({ teamId, currentUserEmail }: { teamId: string, currentUserEmail: string }) {
+interface ChatMember {
+    email: string
+    first_name?: string
+    last_name?: string
+}
+
+export default function TeamChat({ 
+    teamId, 
+    currentUserEmail,
+    members = []
+}: { 
+    teamId: string, 
+    currentUserEmail: string,
+    members?: ChatMember[]
+}) {
     const [messages, setMessages] = useState<Message[]>([])
     const [newMessage, setNewMessage] = useState('')
     const [loading, setLoading] = useState(true)
     const [isRealtimeConnected, setIsRealtimeConnected] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const [supabase] = useState(() => createClient())
+
+    const getAuthorName = (email: string) => {
+        const member = members.find(m => m.email === email)
+        if (member && member.first_name && member.last_name) {
+            return `${member.first_name} ${member.last_name}`
+        }
+        return email.split('@')[0]
+    }
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -135,7 +157,7 @@ export default function TeamChat({ teamId, currentUserEmail }: { teamId: string,
                                     : 'bg-neutral-800 text-gray-200 rounded-bl-none'
                             }`}>
                                 {!isMe && (
-                                    <div className="text-xs text-indigo-300 mb-1 font-medium">{msg.user_email.split('@')[0]}</div>
+                                    <div className="text-xs text-indigo-300 mb-1 font-medium">{getAuthorName(msg.user_email)}</div>
                                 )}
                                 <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
                                 <div className={`text-[10px] mt-1 ${isMe ? 'text-indigo-200' : 'text-gray-500'} text-right`}>
