@@ -439,17 +439,47 @@ export async function createResponse(queryId: string, content: string, courseId:
 
         if (!user || !user.email) throw new Error('No autenticado')
 
+        const adminClient = createAdminClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!,
+            {
+                auth: {
+                    autoRefreshToken: false,
+                    persistSession: false
+                }
+            }
+        )
+
         // Determine role (teacher or student)
-        const { data: enrollment } = await supabase
-            .from('course_enrollments')
-            .select('role')
-            .eq('course_id', courseId)
+        // Check permissions using admin client to bypass RLS and handle case sensitivity
+        let role = 'estudiante'
+        
+        // Check if admin
+        const { data: profile } = await adminClient
+            .from('profiles')
+            .select('roles')
             .eq('email', user.email)
             .single()
+        
+        const isAdmin = profile?.roles?.some((r: string) => ['admin-plataforma', 'admin-institucion'].includes(r))
+        
+        if (isAdmin) {
+            role = 'docente' // Admins act as teachers
+        } else {
+            const { data: enrollment } = await adminClient
+                .from('course_enrollments')
+                .select('role')
+                .eq('course_id', courseId)
+                .ilike('email', user.email) // Case insensitive check
+                .single()
 
-        const role = enrollment?.role || 'estudiante'
+            if (!enrollment) {
+                 throw new Error('No estás inscrito en este curso')
+            }
+            role = enrollment.role
+        }
 
-        const { error } = await supabase
+        const { error } = await adminClient
             .from('query_responses')
             .insert({
                 query_id: queryId,
@@ -475,8 +505,19 @@ export async function toggleResolved(queryId: string, courseId: string) {
 
         if (!user || !user.email) throw new Error('No autenticado')
 
+        const adminClient = createAdminClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!,
+            {
+                auth: {
+                    autoRefreshToken: false,
+                    persistSession: false
+                }
+            }
+        )
+
         // Check if user is creator or teacher
-        const { data: query } = await supabase
+        const { data: query } = await adminClient
             .from('queries')
             .select('user_email, is_resolved')
             .eq('id', queryId)
@@ -484,21 +525,41 @@ export async function toggleResolved(queryId: string, courseId: string) {
 
         if (!query) throw new Error('Consulta no encontrada')
 
-        const { data: enrollment } = await supabase
-            .from('course_enrollments')
-            .select('role')
-            .eq('course_id', courseId)
+        // Check enrollment or admin
+        let isTeacher = false
+        
+        // Check if admin
+        const { data: profile } = await adminClient
+            .from('profiles')
+            .select('roles')
             .eq('email', user.email)
             .single()
+        
+        const isAdmin = profile?.roles?.some((r: string) => ['admin-plataforma', 'admin-institucion'].includes(r))
 
-        const isTeacher = enrollment?.role === 'docente'
-        const isCreator = query.user_email === user.email
+        if (isAdmin) {
+            isTeacher = true
+        } else {
+            const { data: enrollment } = await adminClient
+                .from('course_enrollments')
+                .select('role')
+                .eq('course_id', courseId)
+                .ilike('email', user.email)
+                .single()
+            
+            isTeacher = enrollment?.role === 'docente'
+        }
 
-        if (!isTeacher && !isCreator) {
+        const isCreator = query.user_email === user.email // user.email is from auth, query.user_email is from DB. might need case insensitive check here too?
+        // Ideally query.user_email is stored as lowercase or consistent. But let's assume strict equality for now or use lowerCase if needed.
+        // Actually, let's be safe and use lowerCase comparison
+        const isCreatorCaseInsensitive = query.user_email.toLowerCase() === user.email.toLowerCase()
+
+        if (!isTeacher && !isCreatorCaseInsensitive) {
             throw new Error('No tienes permiso para modificar esta consulta')
         }
 
-        const { error } = await supabase
+        const { error } = await adminClient
             .from('queries')
             .update({ is_resolved: !query.is_resolved })
             .eq('id', queryId)
@@ -520,8 +581,58 @@ export async function deleteQuery(queryId: string, courseId: string) {
 
         if (!user || !user.email) throw new Error('No autenticado')
 
-        // Permissions handled by RLS, but we can double check or just try delete
-        const { error } = await supabase
+        const adminClient = createAdminClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!,
+            {
+                auth: {
+                    autoRefreshToken: false,
+                    persistSession: false
+                }
+            }
+        )
+
+        // Get query to check owner
+        const { data: query } = await adminClient
+            .from('queries')
+            .select('user_email')
+            .eq('id', queryId)
+            .single()
+
+        if (!query) throw new Error('Consulta no encontrada')
+
+        // Check permissions
+        let isTeacher = false
+        
+        // Check if admin
+        const { data: profile } = await adminClient
+            .from('profiles')
+            .select('roles')
+            .eq('email', user.email)
+            .single()
+        
+        const isAdmin = profile?.roles?.some((r: string) => ['admin-plataforma', 'admin-institucion'].includes(r))
+
+        if (isAdmin) {
+            isTeacher = true
+        } else {
+            const { data: enrollment } = await adminClient
+                .from('course_enrollments')
+                .select('role')
+                .eq('course_id', courseId)
+                .ilike('email', user.email)
+                .single()
+            
+            isTeacher = enrollment?.role === 'docente'
+        }
+
+        const isCreatorCaseInsensitive = query.user_email.toLowerCase() === user.email.toLowerCase()
+
+        if (!isTeacher && !isCreatorCaseInsensitive) {
+            throw new Error('No tienes permiso para eliminar esta consulta')
+        }
+
+        const { error } = await adminClient
             .from('queries')
             .delete()
             .eq('id', queryId)
