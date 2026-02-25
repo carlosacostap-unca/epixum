@@ -31,9 +31,17 @@ interface StudentTeamViewProps {
     courseId: string
     team: Team | null
     currentUserEmail: string
+    subtitle?: string
+    disableLinks?: boolean
 }
 
-export default function StudentTeamView({ courseId, team, currentUserEmail }: StudentTeamViewProps) {
+export default function StudentTeamView({ 
+    courseId, 
+    team, 
+    currentUserEmail,
+    subtitle = "Tu equipo asignado",
+    disableLinks = false
+}: StudentTeamViewProps) {
     if (!team) {
         return (
             <div className="bg-neutral-900 rounded-lg p-8 border border-neutral-800 text-center">
@@ -53,7 +61,7 @@ export default function StudentTeamView({ courseId, team, currentUserEmail }: St
             {/* Header */}
             <div className="bg-neutral-900 rounded-lg p-4 md:p-6 border border-neutral-800">
                 <h2 className="text-2xl font-bold text-indigo-400 mb-1">{team.name}</h2>
-                <p className="text-gray-500 text-sm">Tu equipo asignado</p>
+                <p className="text-gray-500 text-sm">{subtitle}</p>
             </div>
 
             {/* Members Grid */}
@@ -62,12 +70,8 @@ export default function StudentTeamView({ courseId, team, currentUserEmail }: St
                     if (a.email === currentUserEmail) return -1
                     if (b.email === currentUserEmail) return 1
                     return 0
-                }).map((member) => (
-                    <Link 
-                        key={member.id || member.email} 
-                        href={`/student/courses/${courseId}/team/${member.id}`}
-                        className="block h-full transition-transform hover:scale-[1.02]"
-                    >
+                }).map((member) => {
+                    const content = (
                         <div className="bg-neutral-900 rounded-lg border border-neutral-800 overflow-hidden flex items-center p-6 gap-4 hover:border-indigo-500/50 transition-colors h-full cursor-pointer">
                             <div className="h-16 w-16 rounded-full bg-indigo-900/50 flex items-center justify-center text-indigo-300 font-bold border border-indigo-500/30 text-2xl flex-shrink-0 overflow-hidden">
                                 {member.avatar_url ? (
@@ -88,8 +92,22 @@ export default function StudentTeamView({ courseId, team, currentUserEmail }: St
                                 </h4>
                             </div>
                         </div>
-                    </Link>
-                ))}
+                    )
+
+                    if (disableLinks) {
+                        return <div key={member.id || member.email} className="block h-full">{content}</div>
+                    }
+
+                    return (
+                        <Link 
+                            key={member.id || member.email} 
+                            href={`/student/courses/${courseId}/team/${member.id}`}
+                            className="block h-full transition-transform hover:scale-[1.02]"
+                        >
+                            {content}
+                        </Link>
+                    )
+                })}
             </div>
             
             {/* Chat Section */}

@@ -38,7 +38,7 @@ export default function TeamManagement({
     const [isCreating, setIsCreating] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const [isAddingMember, setIsAddingMember] = useState<string | null>(null) // teamId
-    const [selectedTeamForChat, setSelectedTeamForChat] = useState<Team | null>(null)
+    const [selectedTeamForDetail, setSelectedTeamForDetail] = useState<Team | null>(null)
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
 
     useEffect(() => {
@@ -187,14 +187,15 @@ export default function TeamManagement({
                                 <div className="flex items-center gap-3">
                                     <h3 className="text-lg font-bold text-gray-100">{team.name}</h3>
                                     <button
-                                        onClick={() => setSelectedTeamForChat(team)}
+                                        onClick={() => setSelectedTeamForDetail(team)}
                                         className="text-indigo-400 hover:text-indigo-300 p-1.5 rounded hover:bg-indigo-900/30 transition-colors flex items-center gap-1 text-xs font-medium border border-indigo-500/30"
-                                        title="Abrir Chat"
+                                        title="Ver integrantes y chat"
                                     >
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 9.75a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12.375m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375m-13.5 3.01c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.184-4.183a1.14 1.14 0 01.778-.332 48.294 48.294 0 005.83-.498c1.585-.233 2.708-1.626 2.708-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                         </svg>
-                                        Chat
+                                        Ver Equipo
                                     </button>
                                 </div>
                                 <button 
