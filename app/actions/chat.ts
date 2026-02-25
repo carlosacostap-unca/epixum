@@ -1,12 +1,66 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 
 export async function getTeamMessages(teamId: string) {
     try {
         const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+
+        if (!user || !user.email) throw new Error('No autenticado')
         
-        const { data, error } = await supabase
+        // Check permissions
+        // 1. Check if user is in the team
+        const { data: teamMember } = await supabase
+            .from('team_members')
+            .select('id')
+            .eq('team_id', teamId)
+            .eq('email', user.email)
+            .single()
+
+        let hasAccess = !!teamMember
+
+        if (!hasAccess) {
+            // 2. Check if user is docente/nodocente in the course
+            const { data: team } = await supabase
+                .from('teams')
+                .select('course_id')
+                .eq('id', teamId)
+                .single()
+            
+            if (team) {
+                const { data: enrollment } = await supabase
+                    .from('course_enrollments')
+                    .select('role')
+                    .eq('course_id', team.course_id)
+                    .ilike('email', user.email)
+                    .in('role', ['docente', 'nodocente', 'admin-institucion'])
+                    .single()
+                
+                if (enrollment) {
+                    hasAccess = true
+                }
+            }
+        }
+
+        if (!hasAccess) {
+             throw new Error('No tienes permisos para ver este chat')
+        }
+
+        // Use Admin Client to fetch messages (bypassing RLS if needed for docentes)
+        const adminClient = createAdminClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!,
+            {
+                auth: {
+                    autoRefreshToken: false,
+                    persistSession: false
+                }
+            }
+        )
+
+        const { data, error } = await adminClient
             .from('team_messages')
             .select('*')
             .eq('team_id', teamId)
@@ -29,7 +83,57 @@ export async function sendMessage(teamId: string, content: string) {
         
         if (!user || !user.email) throw new Error('No autenticado')
 
-        const { data, error } = await supabase
+        // Check permissions
+        // 1. Check if user is in the team
+        const { data: teamMember } = await supabase
+            .from('team_members')
+            .select('id')
+            .eq('team_id', teamId)
+            .eq('email', user.email)
+            .single()
+
+        let hasAccess = !!teamMember
+
+        if (!hasAccess) {
+            // 2. Check if user is docente/nodocente in the course
+            const { data: team } = await supabase
+                .from('teams')
+                .select('course_id')
+                .eq('id', teamId)
+                .single()
+            
+            if (team) {
+                const { data: enrollment } = await supabase
+                    .from('course_enrollments')
+                    .select('role')
+                    .eq('course_id', team.course_id)
+                    .ilike('email', user.email)
+                    .in('role', ['docente', 'nodocente', 'admin-institucion'])
+                    .single()
+                
+                if (enrollment) {
+                    hasAccess = true
+                }
+            }
+        }
+
+        if (!hasAccess) {
+             throw new Error('No tienes permisos para enviar mensajes a este equipo')
+        }
+
+        // Use Admin Client to send message
+        const adminClient = createAdminClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!,
+            {
+                auth: {
+                    autoRefreshToken: false,
+                    persistSession: false
+                }
+            }
+        )
+
+        const { data, error } = await adminClient
             .from('team_messages')
             .insert({
                 team_id: teamId,
