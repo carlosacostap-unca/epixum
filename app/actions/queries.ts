@@ -11,30 +11,49 @@ export async function getQueries(courseId: string, contextType: 'general' | 'cla
 
         if (!user || !user.email) throw new Error('No autenticado')
 
-        // Check if guest (invitado) to bypass RLS
-        const { data: profile } = await supabase
+        const adminClient = createAdminClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!,
+            {
+                auth: {
+                    autoRefreshToken: false,
+                    persistSession: false
+                }
+            }
+        )
+
+        // Check permissions manually to bypass RLS and handle case sensitivity
+        // 1. Check if admin or guest
+        const { data: profile } = await adminClient
             .from('profiles')
             .select('roles')
             .eq('email', user.email)
             .single()
         
+        const isAdmin = profile?.roles?.some((r: string) => ['admin-plataforma', 'admin-institucion'].includes(r))
         const isGuest = profile?.roles?.includes('invitado')
 
-        let client: any = supabase
-        if (isGuest) {
-             client = createAdminClient(
-                process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                process.env.SUPABASE_SERVICE_ROLE_KEY!,
-                {
-                    auth: {
-                        autoRefreshToken: false,
-                        persistSession: false
-                    }
-                }
-            )
+        let hasAccess = isAdmin || isGuest
+
+        if (!hasAccess) {
+            // 2. Check enrollment with ilike
+            const { data: enrollment } = await adminClient
+                .from('course_enrollments')
+                .select('role')
+                .eq('course_id', courseId)
+                .ilike('email', user.email)
+                .single()
+            
+            if (enrollment) {
+                hasAccess = true
+            }
         }
 
-        let query = client
+        if (!hasAccess) {
+             throw new Error('No tienes acceso a este curso')
+        }
+
+        let query = adminClient
             .from('queries')
             .select(`
                 *,
@@ -85,33 +104,52 @@ export async function getCourseQueries(
 
         if (!user || !user.email) throw new Error('No autenticado')
 
-        // Check if guest (invitado) to bypass RLS
-        const { data: profile } = await supabase
+        const adminClient = createAdminClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!,
+            {
+                auth: {
+                    autoRefreshToken: false,
+                    persistSession: false
+                }
+            }
+        )
+
+        // Check permissions manually to bypass RLS and handle case sensitivity
+        // 1. Check if admin or guest
+        const { data: profile } = await adminClient
             .from('profiles')
             .select('roles')
             .eq('email', user.email)
             .single()
         
+        const isAdmin = profile?.roles?.some((r: string) => ['admin-plataforma', 'admin-institucion'].includes(r))
         const isGuest = profile?.roles?.includes('invitado')
 
-        let client: any = supabase
-        if (isGuest) {
-             client = createAdminClient(
-                process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                process.env.SUPABASE_SERVICE_ROLE_KEY!,
-                {
-                    auth: {
-                        autoRefreshToken: false,
-                        persistSession: false
-                    }
-                }
-            )
+        let hasAccess = isAdmin || isGuest
+
+        if (!hasAccess) {
+            // 2. Check enrollment with ilike
+            const { data: enrollment } = await adminClient
+                .from('course_enrollments')
+                .select('role')
+                .eq('course_id', courseId)
+                .ilike('email', user.email)
+                .single()
+            
+            if (enrollment) {
+                hasAccess = true
+            }
+        }
+
+        if (!hasAccess) {
+             throw new Error('No tienes acceso a este curso')
         }
 
         const from = (page - 1) * limit
         const to = from + limit - 1
 
-        let query = client
+        let query = adminClient
             .from('queries')
             .select(`
                 *,
@@ -140,7 +178,7 @@ export async function getCourseQueries(
         let profiles: any[] = []
         
         if (userEmails.length > 0) {
-            const { data: profilesData } = await supabase
+            const { data: profilesData } = await adminClient
                 .from('profiles')
                 .select('email, first_name, last_name')
                 .in('email', userEmails)
@@ -180,30 +218,59 @@ export async function getQueryResponses(queryId: string) {
 
         if (!user || !user.email) throw new Error('No autenticado')
 
-        // Check if guest (invitado) to bypass RLS
-        const { data: profile } = await supabase
+        const adminClient = createAdminClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!,
+            {
+                auth: {
+                    autoRefreshToken: false,
+                    persistSession: false
+                }
+            }
+        )
+
+        // Need courseId to check enrollment
+        // Get query to find course_id
+        const { data: query } = await adminClient
+            .from('queries')
+            .select('course_id')
+            .eq('id', queryId)
+            .single()
+
+        if (!query) throw new Error('Consulta no encontrada')
+
+        // Check permissions manually to bypass RLS and handle case sensitivity
+        // 1. Check if admin or guest
+        const { data: profile } = await adminClient
             .from('profiles')
             .select('roles')
             .eq('email', user.email)
             .single()
         
+        const isAdmin = profile?.roles?.some((r: string) => ['admin-plataforma', 'admin-institucion'].includes(r))
         const isGuest = profile?.roles?.includes('invitado')
 
-        let client: any = supabase
-        if (isGuest) {
-             client = createAdminClient(
-                process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                process.env.SUPABASE_SERVICE_ROLE_KEY!,
-                {
-                    auth: {
-                        autoRefreshToken: false,
-                        persistSession: false
-                    }
-                }
-            )
+        let hasAccess = isAdmin || isGuest
+
+        if (!hasAccess) {
+            // 2. Check enrollment with ilike
+            const { data: enrollment } = await adminClient
+                .from('course_enrollments')
+                .select('role')
+                .eq('course_id', query.course_id)
+                .ilike('email', user.email)
+                .single()
+            
+            if (enrollment) {
+                hasAccess = true
+            }
         }
 
-        const { data, error } = await client
+        if (!hasAccess) {
+             throw new Error('No tienes acceso a esta consulta')
+        }
+
+        const { data, error } = await adminClient
             .from('query_responses')
             .select('*')
             .eq('query_id', queryId)
@@ -216,7 +283,7 @@ export async function getQueryResponses(queryId: string) {
         let profiles: any[] = []
 
         if (userEmails.length > 0) {
-            const { data: profilesData } = await supabase
+            const { data: profilesData } = await adminClient
                 .from('profiles')
                 .select('email, first_name, last_name')
                 .in('email', userEmails)
@@ -248,36 +315,60 @@ export async function getAllCourseQueries(courseId: string) {
 
         if (!user || !user.email) throw new Error('No autenticado')
 
-        // Check if guest (invitado) to bypass RLS
-        const { data: profile } = await supabase
+        const adminClient = createAdminClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!,
+            {
+                auth: {
+                    autoRefreshToken: false,
+                    persistSession: false
+                }
+            }
+        )
+
+        // Check permissions manually to bypass RLS and handle case sensitivity
+        // 1. Check if admin or guest
+        const { data: profile } = await adminClient
             .from('profiles')
             .select('roles')
             .eq('email', user.email)
             .single()
         
+        const isAdmin = profile?.roles?.some((r: string) => ['admin-plataforma', 'admin-institucion'].includes(r))
         const isGuest = profile?.roles?.includes('invitado')
 
-        let client: any = supabase
-        if (isGuest) {
-             client = createAdminClient(
-                process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                process.env.SUPABASE_SERVICE_ROLE_KEY!,
-                {
-                    auth: {
-                        autoRefreshToken: false,
-                        persistSession: false
-                    }
-                }
-            )
+        let hasAccess = isAdmin || isGuest
+
+        if (!hasAccess) {
+            // 2. Check enrollment with ilike
+            const { data: enrollment } = await adminClient
+                .from('course_enrollments')
+                .select('role')
+                .eq('course_id', courseId)
+                .ilike('email', user.email)
+                .single()
+            
+            if (enrollment) {
+                hasAccess = true
+            }
         }
 
-        // Fetch queries with response count instead of full responses
-        const { data, error } = await client
+        if (!hasAccess) {
+             throw new Error('No tienes acceso a este curso')
+        }
+
+        const { data, error } = await adminClient
             .from('queries')
             .select(`
                 *,
-                query_responses (count)
-            `, { count: 'exact' })
+                query_responses (
+                    id,
+                    content,
+                    user_email,
+                    user_role,
+                    created_at
+                )
+            `)
             .eq('course_id', courseId)
             .order('created_at', { ascending: false })
 
@@ -290,7 +381,7 @@ export async function getAllCourseQueries(courseId: string) {
         let profiles: any[] = []
         
         if (userEmails.length > 0) {
-            const { data: profilesData } = await supabase
+            const { data: profilesData } = await adminClient
                 .from('profiles')
                 .select('email, first_name, last_name')
                 .in('email', userEmails)
@@ -300,15 +391,16 @@ export async function getAllCourseQueries(courseId: string) {
             }
         }
 
-        // Attach profile info and format response count
+        // Sort responses by date and attach profile info
         const queries = data.map((q: any) => {
             const profile = profiles.find(p => p.email === q.user_email)
             return {
                 ...q,
                 first_name: profile?.first_name || '',
                 last_name: profile?.last_name || '',
-                response_count: q.query_responses[0]?.count || 0,
-                query_responses: [] // Don't return responses initially
+                query_responses: q.query_responses.sort((a: any, b: any) => 
+                    new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+                )
             }
         })
 
@@ -357,8 +449,50 @@ export async function searchCourseQueries(courseId: string, term: string) {
 
         if (!user || !user.email) throw new Error('No autenticado')
 
+        const adminClient = createAdminClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!,
+            {
+                auth: {
+                    autoRefreshToken: false,
+                    persistSession: false
+                }
+            }
+        )
+
+        // Check permissions manually to bypass RLS and handle case sensitivity
+        // 1. Check if admin or guest
+        const { data: profile } = await adminClient
+            .from('profiles')
+            .select('roles')
+            .eq('email', user.email)
+            .single()
+        
+        const isAdmin = profile?.roles?.some((r: string) => ['admin-plataforma', 'admin-institucion'].includes(r))
+        const isGuest = profile?.roles?.includes('invitado')
+
+        let hasAccess = isAdmin || isGuest
+
+        if (!hasAccess) {
+            // 2. Check enrollment with ilike
+            const { data: enrollment } = await adminClient
+                .from('course_enrollments')
+                .select('role')
+                .eq('course_id', courseId)
+                .ilike('email', user.email)
+                .single()
+            
+            if (enrollment) {
+                hasAccess = true
+            }
+        }
+
+        if (!hasAccess) {
+             throw new Error('No tienes acceso a este curso')
+        }
+
         // 1. Search in queries content
-        const { data: queriesMatching, error: queriesError } = await supabase
+        const { data: queriesMatching, error: queriesError } = await adminClient
             .from('queries')
             .select('id')
             .eq('course_id', courseId)
@@ -368,7 +502,7 @@ export async function searchCourseQueries(courseId: string, term: string) {
 
         // 2. Search in responses content (linked to this course)
         // We use !inner to filter by the related query's course_id
-        const { data: responsesMatching, error: responsesError } = await supabase
+        const { data: responsesMatching, error: responsesError } = await adminClient
             .from('query_responses')
             .select('query_id, queries!inner(course_id)')
             .eq('queries.course_id', courseId)
@@ -386,7 +520,7 @@ export async function searchCourseQueries(courseId: string, term: string) {
         }
 
         // 4. Fetch full details for these queries
-        const { data, error } = await supabase
+        const { data, error } = await adminClient
             .from('queries')
             .select(`
                 *,
@@ -404,7 +538,7 @@ export async function searchCourseQueries(courseId: string, term: string) {
         let profiles: any[] = []
         
         if (userEmails.length > 0) {
-            const { data: profilesData } = await supabase
+            const { data: profilesData } = await adminClient
                 .from('profiles')
                 .select('email, first_name, last_name')
                 .in('email', userEmails)
