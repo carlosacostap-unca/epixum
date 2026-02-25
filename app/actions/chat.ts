@@ -11,15 +11,16 @@ export async function getTeamMessages(teamId: string) {
         if (!user || !user.email) throw new Error('No autenticado')
         
         // Check permissions
-        // 1. Check if user is in the team
-        const { data: teamMember } = await supabase
-            .from('team_members')
+        // 1. Check if user is in the team (Student)
+        // We use course_enrollments because there is no team_members table
+        const { data: studentEnrollment } = await supabase
+            .from('course_enrollments')
             .select('id')
             .eq('team_id', teamId)
-            .eq('email', user.email)
+            .ilike('email', user.email)
             .single()
 
-        let hasAccess = !!teamMember
+        let hasAccess = !!studentEnrollment
 
         if (!hasAccess) {
             // 2. Check if user is docente/nodocente in the course
@@ -84,15 +85,16 @@ export async function sendMessage(teamId: string, content: string) {
         if (!user || !user.email) throw new Error('No autenticado')
 
         // Check permissions
-        // 1. Check if user is in the team
-        const { data: teamMember } = await supabase
-            .from('team_members')
+        // 1. Check if user is in the team (Student)
+        // We use course_enrollments because there is no team_members table
+        const { data: studentEnrollment } = await supabase
+            .from('course_enrollments')
             .select('id')
             .eq('team_id', teamId)
-            .eq('email', user.email)
+            .ilike('email', user.email)
             .single()
 
-        let hasAccess = !!teamMember
+        let hasAccess = !!studentEnrollment
 
         if (!hasAccess) {
             // 2. Check if user is docente/nodocente in the course
