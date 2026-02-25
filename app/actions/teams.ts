@@ -34,20 +34,8 @@ async function checkTeamManagementAccess(courseId: string) {
 
     if (!user || !user.email) throw new Error('No autenticado')
 
-    // Check if user is enrolled as docente or nodocente in this course
-    // We need to check both because this might be used by either
-    const { data: enrollments, error } = await supabase
-        .from('course_enrollments')
-        .select('role')
-        .eq('course_id', courseId)
-        .ilike('email', user.email)
-        .in('role', ['docente', 'nodocente', 'admin-institucion'])
-
-    if (error || !enrollments || enrollments.length === 0) {
-        throw new Error('No autorizado: No tienes permisos para gestionar equipos en este curso')
-    }
-
     // Use Admin Client for operations to ensure we can modify teams and enrollments freely
+    // and to bypass RLS for permission checks
     const adminClient = createAdminClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -58,6 +46,19 @@ async function checkTeamManagementAccess(courseId: string) {
             }
         }
     )
+
+    // Check if user is enrolled as docente or nodocente in this course
+    // We need to check both because this might be used by either
+    const { data: enrollments, error } = await adminClient
+        .from('course_enrollments')
+        .select('role')
+        .eq('course_id', courseId)
+        .ilike('email', user.email)
+        .in('role', ['docente', 'nodocente', 'admin-institucion'])
+
+    if (error || !enrollments || enrollments.length === 0) {
+        throw new Error('No autorizado: No tienes permisos para gestionar equipos en este curso')
+    }
     
     return { supabase: adminClient, user }
 }
