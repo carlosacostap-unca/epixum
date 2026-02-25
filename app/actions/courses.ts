@@ -166,13 +166,14 @@ export async function getCourseStudentsForTeacher(courseId: string) {
         
         const { data: profiles } = await supabase
             .from('profiles')
-            .select('email, first_name, last_name, dni, phone, birth_date, avatar_url')
+            .select('id, email, first_name, last_name, dni, phone, birth_date, avatar_url')
             .in('email', emails)
             
         const studentsWithProfiles = enrollments.map(e => {
             const profile = profiles?.find(p => p.email === e.email)
             return {
                 ...e,
+                id: profile?.id || e.id, // Prefer profile ID (user ID), fallback to enrollment ID if needed
                 first_name: profile?.first_name,
                 last_name: profile?.last_name,
                 dni: profile?.dni,
