@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createTeam, deleteTeam, assignStudentToTeam, removeStudentFromTeam, getTeams } from '@/app/actions/teams'
 import { getCourseStudentsForTeacher } from '@/app/actions/courses'
 import TeamChat from './TeamChat'
+import StudentTeamView from './StudentTeamView'
 
 type Team = {
     id: string
