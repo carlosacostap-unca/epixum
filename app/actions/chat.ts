@@ -43,6 +43,7 @@ export async function getTeamMessages(teamId: string) {
                 .single()
             
             if (team) {
+                // Check course enrollment roles
                 const { data: enrollment } = await adminClient
                     .from('course_enrollments')
                     .select('role')
@@ -53,6 +54,19 @@ export async function getTeamMessages(teamId: string) {
                 
                 if (enrollment) {
                     hasAccess = true
+                } else {
+                    // Also check global roles (admin-plataforma, admin-institucion)
+                    // This is important because admins might not be enrolled in the course
+                     const { data: profile } = await adminClient
+                        .from('profiles')
+                        .select('roles')
+                        .eq('email', user.email)
+                        .single()
+                    
+                    const isAdmin = profile?.roles?.some((r: string) => ['admin-plataforma', 'admin-institucion'].includes(r))
+                    if (isAdmin) {
+                        hasAccess = true
+                    }
                 }
             }
         }
@@ -127,6 +141,18 @@ export async function sendMessage(teamId: string, content: string) {
                 
                 if (enrollment) {
                     hasAccess = true
+                } else {
+                    // Check for admin/guest roles
+                    const { data: profile } = await adminClient
+                        .from('profiles')
+                        .select('roles')
+                        .eq('email', user.email)
+                        .single()
+                    
+                    const isAdmin = profile?.roles?.some((r: string) => ['admin-plataforma', 'admin-institucion'].includes(r))
+                    if (isAdmin) {
+                        hasAccess = true
+                    }
                 }
             }
         }

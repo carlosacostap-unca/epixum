@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { format } from 'date-fns'
 import { createClient } from '@/utils/supabase/client'
 import { sendMessage, getTeamMessages } from '@/app/actions/chat'
 
@@ -161,7 +162,7 @@ export default function TeamChat({
                                 )}
                                 <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
                                 <div className={`text-[10px] mt-1 ${isMe ? 'text-indigo-200' : 'text-gray-500'} text-right`}>
-                                    {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    {format(new Date(msg.created_at), 'dd/MM/yyyy HH:mm')}
                                 </div>
                             </div>
                         </div>
