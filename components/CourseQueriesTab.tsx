@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createQuery, createResponse, toggleResolved, deleteQuery, getAllCourseQueries, getCourseQueries, getQueryResponses, searchCourseQueries } from '@/app/actions/queries'
+import { RichTextEditor, RichTextRenderer } from './RichText'
 
 interface Query {
     id: string
@@ -377,12 +378,10 @@ export default function CourseQueriesTab({ courseId, classes, assignments, curre
 
                         <div>
                             <label className="block text-xs text-gray-400 mb-1">Consulta</label>
-                            <textarea 
+                            <RichTextEditor 
                                 value={newQueryContent}
-                                onChange={(e) => setNewQueryContent(e.target.value)}
-                                placeholder="Escribe tu consulta aquí..."
-                                className="w-full bg-black border border-neutral-700 rounded p-3 text-gray-200 text-sm h-32 focus:outline-none focus:border-indigo-500"
-                                required
+                                onChange={(val) => setNewQueryContent(val || '')}
+                                height={250}
                             />
                         </div>
 
@@ -727,7 +726,9 @@ function QueryItem({ query, courseId, currentUserEmail, isTeacher, contextLabel,
                                 {formatDate(query.created_at)}
                             </span>
                         </div>
-                        <h4 className="text-gray-200 font-medium text-lg leading-snug">{query.content}</h4>
+                        <div className="text-gray-200 font-medium text-lg leading-snug">
+                            <RichTextRenderer source={query.content} />
+                        </div>
                         <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
                             <span>Por: {authorName}</span>
                             <span>•</span>
@@ -772,7 +773,9 @@ function QueryItem({ query, courseId, currentUserEmail, isTeacher, contextLabel,
                                                 {formatDate(response.created_at)}
                                             </span>
                                         </div>
-                                        <p className="text-gray-300 text-sm">{response.content}</p>
+                                        <div className="text-gray-300 text-sm">
+                                            <RichTextRenderer source={response.content} />
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -783,13 +786,13 @@ function QueryItem({ query, courseId, currentUserEmail, isTeacher, contextLabel,
                         {/* Reply Form */}
                         {isReplying ? (
                             <form onSubmit={handleReply} className="mt-4">
-                                <textarea
-                                    value={replyContent}
-                                    onChange={(e) => setReplyContent(e.target.value)}
-                                    placeholder="Escribe tu respuesta..."
-                                    className="w-full bg-black border border-neutral-700 rounded p-3 text-gray-200 text-sm h-24 focus:outline-none focus:border-indigo-500 mb-2"
-                                    autoFocus
-                                />
+                                <div className="mb-2">
+                                    <RichTextEditor
+                                        value={replyContent}
+                                        onChange={(val) => setReplyContent(val || '')}
+                                        height={150}
+                                    />
+                                </div>
                                 <div className="flex justify-end gap-2">
                                     <button 
                                         type="button"
