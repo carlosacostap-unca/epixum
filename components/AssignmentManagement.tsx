@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { createAssignment, deleteAssignment, updateAssignment } from '@/app/actions/assignments'
 import SubmissionList from './SubmissionList'
 import AssignmentResourceList from './AssignmentResourceList'
@@ -25,6 +26,7 @@ interface AssignmentManagementProps {
 }
 
 export default function AssignmentManagement({ courseId, initialAssignments, sprints = [] }: AssignmentManagementProps) {
+    const router = useRouter()
     const [assignments, setAssignments] = useState<Assignment[]>(initialAssignments)
     // If sprints exist, default to the first sprint. Otherwise, default to null (General).
     const [selectedSprintId, setSelectedSprintId] = useState<string | null>(
@@ -47,6 +49,10 @@ export default function AssignmentManagement({ courseId, initialAssignments, spr
     const [editDescription, setEditDescription] = useState('')
     const [editDueDate, setEditDueDate] = useState('')
     const [editSprintId, setEditSprintId] = useState<string>('')
+
+    useEffect(() => {
+        setAssignments(initialAssignments)
+    }, [initialAssignments])
 
     useEffect(() => {
         if (isAdding) {
@@ -81,7 +87,7 @@ export default function AssignmentManagement({ courseId, initialAssignments, spr
                 setDueDate('')
                 setFormSprintId('')
                 setIsAdding(false)
-                window.location.reload()
+                router.refresh()
             } else {
                 alert(result.error || 'Error al crear el trabajo práctico')
             }
@@ -98,7 +104,7 @@ export default function AssignmentManagement({ courseId, initialAssignments, spr
         try {
             const result = await deleteAssignment(id, courseId)
             if (result.success) {
-                window.location.reload()
+                router.refresh()
             } else {
                 alert(result.error || 'Error al eliminar')
             }
@@ -149,7 +155,7 @@ export default function AssignmentManagement({ courseId, initialAssignments, spr
              
              if (result.success) {
                  cancelEditing()
-                 window.location.reload()
+                 router.refresh()
              } else {
                  alert(result.error || 'Error al actualizar el trabajo práctico')
              }

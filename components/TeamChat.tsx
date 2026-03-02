@@ -30,9 +30,7 @@ export default function TeamChat({
     const [messages, setMessages] = useState<Message[]>([])
     const [newMessage, setNewMessage] = useState('')
     const [loading, setLoading] = useState(true)
-    const [isRealtimeConnected, setIsRealtimeConnected] = useState(false)
     const messagesEndRef = useRef<HTMLDivElement>(null)
-    const [supabase] = useState(() => createClient())
 
     const getAuthorName = (email: string) => {
         const member = members.find(m => m.email === email)
@@ -47,45 +45,33 @@ export default function TeamChat({
     }
 
     useEffect(() => {
-        // Initial fetch
+        // Initial fetch and polling
         const fetchMessages = async () => {
             const res = await getTeamMessages(teamId)
             if (res.success && res.data) {
-                setMessages(res.data)
+                setMessages(prev => {
+                    // Only update if there are changes to avoid unnecessary re-renders
+                    // and cursor jumping, although standard state updates usually handle this well.
+                    // For now, simple replacement is fine as we want to ensure consistency.
+                    // To improve UX, we could merge new messages, but full replacement ensures deletion/edits sync.
+                    
+                    // Simple check to avoid flicker if data is identical
+                    if (JSON.stringify(prev) === JSON.stringify(res.data)) return prev
+                    return res.data
+                })
             } else if (!res.success) {
                 console.error("Error fetching messages:", res.error)
             }
             setLoading(false)
         }
+
         fetchMessages()
 
-        // Subscription
-        const channel = supabase
-            .channel(`team_chat:${teamId}`)
-            .on('postgres_changes', {
-                event: 'INSERT',
-                schema: 'public',
-                table: 'team_messages',
-                filter: `team_id=eq.${teamId}`
-            }, (payload) => {
-                const newMsg = payload.new as Message
-                setMessages(prev => {
-                    // Avoid duplicates if optimistic update already added it
-                    if (prev.some(m => m.id === newMsg.id)) return prev
-                    return [...prev, newMsg]
-                })
-            })
-            .subscribe((status) => {
-                setIsRealtimeConnected(status === 'SUBSCRIBED')
-                if (status !== 'SUBSCRIBED' && status !== 'CLOSED') {
-                    console.error("Realtime subscription status:", status)
-                }
-            })
+        // Poll every 1 minute (60000 ms)
+        const intervalId = setInterval(fetchMessages, 60000)
 
-        return () => {
-            supabase.removeChannel(channel)
-        }
-    }, [teamId, supabase])
+        return () => clearInterval(intervalId)
+    }, [teamId])
 
     useEffect(() => {
         scrollToBottom()
@@ -112,11 +98,7 @@ export default function TeamChat({
         if (result.success && result.data) {
             const realMessage = result.data as Message
             setMessages(prev => {
-                // If the message arrived via Realtime already, just remove the optimistic one
-                if (prev.some(m => m.id === realMessage.id)) {
-                    return prev.filter(m => m.id !== tempId)
-                }
-                // Otherwise, replace optimistic with real
+                // Replace optimistic with real
                 return prev.map(m => m.id === tempId ? realMessage : m)
             })
         } else {
@@ -133,10 +115,9 @@ export default function TeamChat({
         <div className="flex flex-col h-[500px] md:h-[600px] bg-neutral-900 border border-neutral-800 rounded-lg overflow-hidden">
             <div className="p-4 border-b border-neutral-800 bg-neutral-900/50 flex justify-between items-center">
                 <h3 className="font-semibold text-gray-200">Chat de Equipo</h3>
-                <div className="flex items-center gap-2" title={isRealtimeConnected ? "Conectado al chat en vivo" : "Desconectado del chat en vivo"}>
-                    <span className={`w-2 h-2 rounded-full ${isRealtimeConnected ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-500'}`}></span>
+                <div className="flex items-center gap-2" title="Actualización automática cada 1 min">
                     <span className="text-xs text-neutral-500 hidden sm:block">
-                        {isRealtimeConnected ? 'En vivo' : 'Desconectado'}
+                        Actualizado hace un momento
                     </span>
                 </div>
             </div>

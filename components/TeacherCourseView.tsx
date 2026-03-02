@@ -135,6 +135,7 @@ export default function TeacherCourseView({
                     courseId={courseId}
                     initialSprints={initialSprints}
                     initialClasses={initialClasses}
+                    initialAssignments={initialAssignments}
                 />
             )}
 

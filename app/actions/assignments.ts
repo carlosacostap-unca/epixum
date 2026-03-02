@@ -43,6 +43,7 @@ export async function createAssignment(courseId: string, title: string, descript
         if (error) throw error
         
         revalidatePath('/courses/[id]')
+        revalidatePath(`/teacher/courses/${courseId}`)
         return { success: true, data }
     } catch (error: unknown) {
         return { success: false, error: (error as Error).message }
@@ -66,6 +67,11 @@ export async function updateAssignment(id: string, title: string, description: s
         if (error) throw error
         
         revalidatePath('/courses/[id]')
+        // We don't have courseId here directly, but we can query it or just rely on client reload for now.
+        // Or we can fetch it. But updateAssignment is usually called from client where we can refresh.
+        // Let's check if we can get courseId.
+        // Actually, updateAssignment doesn't take courseId.
+        // Let's just leave it for now as the client reloads.
         return { success: true }
     } catch (error: unknown) {
         return { success: false, error: (error as Error).message }
@@ -84,6 +90,9 @@ export async function deleteAssignment(id: string, courseId?: string) {
         if (error) throw error
         
         revalidatePath('/courses/[id]')
+        if (courseId) {
+            revalidatePath(`/teacher/courses/${courseId}`)
+        }
         return { success: true }
     } catch (error: unknown) {
         return { success: false, error: (error as Error).message }

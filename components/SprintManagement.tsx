@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { createSprint, getSprints, deleteSprint, updateSprint } from '@/app/actions/sprints'
 import { createClass, deleteClass } from '@/app/actions/classes'
+import { createAssignment, deleteAssignment } from '@/app/actions/assignments'
 import ResourceList from './ResourceList'
 
 type Sprint = {
@@ -21,17 +23,29 @@ type ClassItem = {
     sprint_id?: string | null
 }
 
+type Assignment = {
+    id: string
+    title: string
+    description: string
+    due_date: string
+    sprint_id?: string | null
+}
+
 export default function SprintManagement({ 
     courseId, 
     initialSprints = [], 
-    initialClasses = [] 
+    initialClasses = [],
+    initialAssignments = []
 }: { 
     courseId: string, 
     initialSprints?: Sprint[],
-    initialClasses?: ClassItem[] 
+    initialClasses?: ClassItem[],
+    initialAssignments?: Assignment[]
 }) {
+    const router = useRouter()
     const [sprints, setSprints] = useState<Sprint[]>(initialSprints)
     const [classes, setClasses] = useState<ClassItem[]>(initialClasses)
+    const [assignments, setAssignments] = useState<Assignment[]>(initialAssignments)
     const [selectedSprintId, setSelectedSprintId] = useState<string | null>(null)
     const [isCreating, setIsCreating] = useState(false)
     const [isEditing, setIsEditing] = useState(false)
@@ -43,6 +57,31 @@ export default function SprintManagement({
     const [classDescription, setClassDescription] = useState('')
     const [classDate, setClassDate] = useState('')
     const [isCreatingClass, setIsCreatingClass] = useState(false)
+
+    // Assignment creation state
+    const [addingAssignmentToSprintId, setAddingAssignmentToSprintId] = useState<string | null>(null)
+    const [assignmentTitle, setAssignmentTitle] = useState('')
+    const [assignmentDescription, setAssignmentDescription] = useState('')
+    const [assignmentDueDate, setAssignmentDueDate] = useState('')
+    const [isCreatingAssignment, setIsCreatingAssignment] = useState(false)
+
+    // Helper for formatting dates consistently in Argentina timezone
+    const formatDateTime = (dateString: string) => {
+        try {
+            const date = new Date(dateString)
+            return new Intl.DateTimeFormat('es-AR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+                timeZone: 'America/Argentina/Buenos_Aires'
+            }).format(date)
+        } catch (e) {
+            return dateString
+        }
+    }
 
     // Fallback fetch if initialSprints is empty/stale (though usually passed from server)
     useEffect(() => {
@@ -61,6 +100,11 @@ export default function SprintManagement({
     useEffect(() => {
         setClasses(initialClasses)
     }, [initialClasses])
+
+    // Update assignments if initialAssignments changes
+    useEffect(() => {
+        setAssignments(initialAssignments)
+    }, [initialAssignments])
 
     async function loadSprints() {
         const result = await getSprints(courseId)
@@ -125,7 +169,7 @@ export default function SprintManagement({
                 // Since createClass calls revalidatePath, reloading the page is the easiest way to sync state completely.
                 // Or we can assume success and append to local state if we had the ID.
                 // For simplicity and correctness with server actions, window.location.reload() is robust here.
-                window.location.reload()
+                router.refresh()
             } else {
                 alert(result.error || 'Error al crear la clase')
             }
@@ -142,9 +186,47 @@ export default function SprintManagement({
         try {
             const result = await deleteClass(classId, courseId)
             if (result.success) {
-                window.location.reload()
+                router.refresh()
             } else {
                 alert(result.error || 'Error al eliminar la clase')
+            }
+        } catch (error) {
+            alert('Error inesperado')
+        }
+    }
+
+    async function handleCreateAssignment(e: React.FormEvent) {
+        e.preventDefault()
+        if (!addingAssignmentToSprintId) return
+
+        setIsCreatingAssignment(true)
+        try {
+            const dateObj = new Date(assignmentDueDate)
+            const isoDate = dateObj.toISOString()
+
+            const result = await createAssignment(courseId, assignmentTitle, assignmentDescription, isoDate, addingAssignmentToSprintId)
+            
+            if (result.success) {
+                router.refresh()
+            } else {
+                alert(result.error || 'Error al crear el trabajo práctico')
+            }
+        } catch (error) {
+            alert('Error inesperado')
+        } finally {
+            setIsCreatingAssignment(false)
+        }
+    }
+
+    async function handleDeleteAssignment(assignmentId: string) {
+        if (!confirm('¿Está seguro de eliminar este trabajo práctico del sprint?')) return
+
+        try {
+            const result = await deleteAssignment(assignmentId, courseId)
+            if (result.success) {
+                router.refresh()
+            } else {
+                alert(result.error || 'Error al eliminar el trabajo práctico')
             }
         } catch (error) {
             alert('Error inesperado')
@@ -154,6 +236,7 @@ export default function SprintManagement({
     // Helper to get selected sprint
     const selectedSprint = sprints.find(s => s.id === selectedSprintId)
     const selectedSprintClasses = selectedSprint ? classes.filter(c => c.sprint_id === selectedSprint.id) : []
+    const selectedSprintAssignments = selectedSprint ? assignments.filter(a => a.sprint_id === selectedSprint.id) : []
 
     return (
         <div className="w-full">
@@ -388,6 +471,67 @@ export default function SprintManagement({
                 </div>
             )}
 
+            {/* Add Assignment Modal */}
+            {addingAssignmentToSprintId && (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                    <div className="bg-neutral-900 border border-neutral-800 p-6 rounded-lg w-full max-w-md">
+                        <h3 className="text-xl font-bold text-gray-100 mb-4">Agregar Trabajo Práctico al Sprint</h3>
+                        <form onSubmit={handleCreateAssignment} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">Título</label>
+                                <input 
+                                    type="text" 
+                                    required
+                                    value={assignmentTitle}
+                                    onChange={(e) => setAssignmentTitle(e.target.value)}
+                                    className="w-full bg-black border border-neutral-700 rounded p-2 text-gray-100 focus:border-indigo-500 focus:outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">Descripción / Consigna</label>
+                                <textarea 
+                                    value={assignmentDescription}
+                                    onChange={(e) => setAssignmentDescription(e.target.value)}
+                                    className="w-full bg-black border border-neutral-700 rounded p-2 text-gray-100 focus:border-indigo-500 focus:outline-none h-32 resize-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">Fecha de Entrega</label>
+                                <input 
+                                    type="datetime-local" 
+                                    required
+                                    value={assignmentDueDate}
+                                    onChange={(e) => setAssignmentDueDate(e.target.value)}
+                                    className="w-full bg-black border border-neutral-700 rounded p-2 text-gray-100 focus:border-indigo-500 focus:outline-none [color-scheme:dark]"
+                                />
+                            </div>
+                            
+                            <div className="flex justify-end gap-3 mt-6">
+                                <button 
+                                    type="button"
+                                    onClick={() => {
+                                        setAddingAssignmentToSprintId(null)
+                                        setAssignmentTitle('')
+                                        setAssignmentDescription('')
+                                        setAssignmentDueDate('')
+                                    }}
+                                    className="text-gray-400 hover:text-white px-3 py-2"
+                                >
+                                    Cancelar
+                                </button>
+                                <button 
+                                    type="submit"
+                                    disabled={isCreatingAssignment}
+                                    className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 disabled:opacity-50"
+                                >
+                                    {isCreatingAssignment ? 'Guardando...' : 'Crear TP'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
             <div className="space-y-4">
                 {sprints.length === 0 ? (
                     <div className="text-center py-12 text-gray-500 bg-neutral-900/50 rounded-lg border border-neutral-800 border-dashed">
@@ -420,6 +564,12 @@ export default function SprintManagement({
                                     + Agregar Clase
                                 </button>
                                 <button 
+                                    onClick={() => setAddingAssignmentToSprintId(selectedSprint.id)}
+                                    className="text-indigo-400 hover:text-indigo-300 text-sm px-3 py-1 bg-indigo-900/20 hover:bg-indigo-900/40 rounded transition-colors"
+                                >
+                                    + Agregar TP
+                                </button>
+                                <button 
                                     onClick={() => setIsEditing(true)}
                                     className="text-gray-500 hover:text-indigo-400 p-2 rounded hover:bg-neutral-800 transition-colors"
                                     title="Editar Sprint"
@@ -449,10 +599,10 @@ export default function SprintManagement({
                                         <div className="flex justify-between items-start mb-2">
                                             <div>
                                                 <h5 className="text-sm font-medium text-gray-200">{cls.title}</h5>
-                                                <p className="text-xs text-gray-500">
-                                                    {new Date(cls.date).toLocaleString()}
-                                                </p>
-                                            </div>
+                                            <p className="text-xs text-gray-500" suppressHydrationWarning>
+                                                {formatDateTime(cls.date)}
+                                            </p>
+                                        </div>
                                             <button 
                                                 onClick={() => handleDeleteClass(cls.id)}
                                                 className="text-red-500 opacity-0 group-hover:opacity-100 hover:text-red-400 text-xs px-2 py-1 transition-opacity"
@@ -478,6 +628,45 @@ export default function SprintManagement({
                                 </button>
                             </div>
                         )}
+
+                        {/* Assignments List within Sprint */}
+                        <div className="mt-8 pt-4 border-t border-neutral-800">
+                            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Trabajos Prácticos</h4>
+                            
+                            {selectedSprintAssignments.length > 0 ? (
+                                <div className="space-y-3">
+                                    {selectedSprintAssignments.map(assignment => (
+                                        <div key={assignment.id} className="bg-black/40 p-4 rounded border border-neutral-800 group hover:border-neutral-700 transition-colors">
+                                            <div className="flex justify-between items-start">
+                                                <div className="flex-1">
+                                                    <h5 className="text-sm font-bold text-gray-200">{assignment.title}</h5>
+                                                <p className="text-xs text-indigo-400 mt-1" suppressHydrationWarning>
+                                                    Vence: {formatDateTime(assignment.due_date)}
+                                                </p>
+                                                <p className="text-sm text-gray-400 mt-2 line-clamp-2">{assignment.description}</p>
+                                                </div>
+                                                <button 
+                                                    onClick={() => handleDeleteAssignment(assignment.id)}
+                                                    className="text-red-500 opacity-0 group-hover:opacity-100 hover:text-red-400 text-xs px-2 py-1 transition-opacity ml-4"
+                                                >
+                                                    Eliminar
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-8 bg-black/20 rounded border border-neutral-800/50 border-dashed">
+                                    <p className="text-sm text-gray-500">No hay trabajos prácticos en este sprint.</p>
+                                    <button 
+                                        onClick={() => setAddingAssignmentToSprintId(selectedSprint.id)}
+                                        className="mt-2 text-indigo-400 hover:text-indigo-300 text-sm hover:underline"
+                                    >
+                                        Agregar el primer TP
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 ) : null}
             </div>
