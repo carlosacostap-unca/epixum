@@ -445,5 +445,6 @@ export default function TeamManagement({
                 </div>
             )}
         </div>
+        </DragDropContext>
     )
 }
