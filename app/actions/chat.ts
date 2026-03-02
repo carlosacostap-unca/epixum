@@ -111,6 +111,15 @@ export async function sendMessage(teamId: string, content: string) {
             }
         )
 
+        // Get team details (needed for course_id)
+        const { data: team } = await adminClient
+            .from('teams')
+            .select('course_id')
+            .eq('id', teamId)
+            .single()
+
+        if (!team) throw new Error('Equipo no encontrado')
+
         // Check permissions
         // 1. Check if user is in the team (Student)
         const { data: studentEnrollment } = await adminClient
@@ -124,35 +133,27 @@ export async function sendMessage(teamId: string, content: string) {
 
         if (!hasAccess) {
             // 2. Check if user is docente/nodocente in the course
-            const { data: team } = await adminClient
-                .from('teams')
-                .select('course_id')
-                .eq('id', teamId)
+            const { data: enrollment } = await adminClient
+                .from('course_enrollments')
+                .select('role')
+                .eq('course_id', team.course_id)
+                .ilike('email', user.email)
+                .in('role', ['docente', 'nodocente', 'admin-institucion'])
                 .single()
             
-            if (team) {
-                const { data: enrollment } = await adminClient
-                    .from('course_enrollments')
-                    .select('role')
-                    .eq('course_id', team.course_id)
-                    .ilike('email', user.email)
-                    .in('role', ['docente', 'nodocente', 'admin-institucion'])
+            if (enrollment) {
+                hasAccess = true
+            } else {
+                // Check for admin/guest roles
+                const { data: profile } = await adminClient
+                    .from('profiles')
+                    .select('roles')
+                    .eq('email', user.email)
                     .single()
                 
-                if (enrollment) {
+                const isAdmin = profile?.roles?.some((r: string) => ['admin-plataforma', 'admin-institucion'].includes(r))
+                if (isAdmin) {
                     hasAccess = true
-                } else {
-                    // Check for admin/guest roles
-                    const { data: profile } = await adminClient
-                        .from('profiles')
-                        .select('roles')
-                        .eq('email', user.email)
-                        .single()
-                    
-                    const isAdmin = profile?.roles?.some((r: string) => ['admin-plataforma', 'admin-institucion'].includes(r))
-                    if (isAdmin) {
-                        hasAccess = true
-                    }
                 }
             }
         }
@@ -166,6 +167,7 @@ export async function sendMessage(teamId: string, content: string) {
             .from('team_messages')
             .insert({
                 team_id: teamId,
+                course_id: team.course_id,
                 content,
                 user_email: user.email
             })
