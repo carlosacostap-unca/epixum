@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createTeam, deleteTeam, assignStudentToTeam, removeStudentFromTeam, getTeams } from '@/app/actions/teams'
 import { getCourseStudentsForTeacher } from '@/app/actions/courses'
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
 import TeamChat from './TeamChat'
 import StudentTeamView from './StudentTeamView'
 
@@ -107,8 +108,57 @@ export default function TeamManagement({
 
     const unassignedStudents = students.filter(s => !s.team_id)
 
+    const onDragEnd = async (result: DropResult) => {
+        const { source, destination, draggableId } = result
+        
+        // Dropped outside or same position
+        if (!destination || (source.droppableId === destination.droppableId && source.index === destination.index)) {
+            return
+        }
+
+        // Find the student
+        const student = students.find(s => s.id === draggableId)
+        if (!student) return
+
+        const newTeamId = destination.droppableId
+        const oldTeamId = source.droppableId
+
+        // Optimistic update
+        setStudents(prev => prev.map(s => {
+            if (s.id === draggableId) {
+                return { ...s, team_id: newTeamId }
+            }
+            return s
+        }))
+
+        // Call API
+        try {
+            const resultAction = await assignStudentToTeam(student.email, newTeamId, courseId)
+            if (!resultAction.success) {
+                // Revert on failure
+                setStudents(prev => prev.map(s => {
+                    if (s.id === draggableId) {
+                        return { ...s, team_id: oldTeamId }
+                    }
+                    return s
+                }))
+                alert('Error al mover estudiante: ' + resultAction.error)
+            }
+        } catch (error) {
+            // Revert on failure
+            setStudents(prev => prev.map(s => {
+                if (s.id === draggableId) {
+                    return { ...s, team_id: oldTeamId }
+                }
+                return s
+            }))
+            alert('Error al mover estudiante')
+        }
+    }
+
     return (
-        <div className="w-full space-y-8">
+        <DragDropContext onDragEnd={onDragEnd}>
+            <div className="w-full space-y-8">
             {selectedTeamForDetail && (
                 <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
                     <div className="bg-neutral-900 border border-neutral-800 rounded-lg w-full max-w-5xl flex flex-col max-h-[90vh] shadow-2xl">
@@ -218,33 +268,74 @@ export default function TeamManagement({
 
                             <div className="space-y-2">
                                 <h4 className="text-xs text-gray-500 font-medium uppercase tracking-wider">Miembros</h4>
-                                {members.length === 0 ? (
-                                    <p className="text-sm text-gray-600 italic">Sin miembros</p>
-                                ) : (
-                                    <ul className="space-y-2">
-                                        {members.map(member => (
-                                            <li key={member.email} className="flex justify-between items-center bg-neutral-950 p-2 rounded border border-neutral-800">
-                                                <span 
-                                                    className="text-sm font-medium text-gray-200 cursor-pointer hover:text-indigo-400 transition-colors"
-                                                    onClick={() => setSelectedStudent(member)}
-                                                >
-                                                    {member.first_name || member.last_name 
-                                                        ? `${member.last_name || ''}, ${member.first_name || ''}`.trim().replace(/^, /, '').replace(/, $/, '')
-                                                        : member.email}
-                                                </span>
-                                                <button 
-                                                    onClick={() => handleRemoveMember(member.email)}
-                                                    className="text-gray-600 hover:text-red-400"
-                                                    title="Quitar del equipo"
-                                                >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                                    </svg>
-                                                </button>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
+                                <Droppable droppableId={team.id}>
+                                    {(provided, snapshot) => (
+                                        <div 
+                                            ref={provided.innerRef} 
+                                            {...provided.droppableProps}
+                                            className={`min-h-[50px] transition-colors rounded ${
+                                                snapshot.isDraggingOver ? 'bg-indigo-900/20 ring-2 ring-indigo-500/50' : ''
+                                            }`}
+                                        >
+                                            {members.length === 0 && !snapshot.isDraggingOver ? (
+                                                <p className="text-sm text-gray-600 italic p-2">Sin miembros</p>
+                                            ) : (
+                                                <ul className="space-y-2">
+                                                    {members.map((member, index) => (
+                                                        <Draggable key={member.id} draggableId={member.id} index={index}>
+                                                            {(provided, snapshot) => (
+                                                                <li 
+                                                                    ref={provided.innerRef}
+                                                                    {...provided.draggableProps}
+                                                                    {...provided.dragHandleProps}
+                                                                    className={`flex justify-between items-center bg-neutral-950 p-2 rounded border border-neutral-800 ${
+                                                                        snapshot.isDragging ? 'shadow-lg ring-2 ring-indigo-500 rotate-2 bg-neutral-900 z-50' : ''
+                                                                    }`}
+                                                                    style={{
+                                                                        ...provided.draggableProps.style,
+                                                                    }}
+                                                                >
+                                                                    <div className="flex items-center gap-2 overflow-hidden">
+                                                                        <div className="w-6 h-6 rounded-full bg-neutral-800 flex items-center justify-center text-xs font-bold text-gray-400 flex-shrink-0">
+                                                                            {member.avatar_url ? (
+                                                                                <img src={member.avatar_url} alt="" className="w-full h-full object-cover rounded-full" />
+                                                                            ) : (
+                                                                                (member.first_name?.[0] || member.email[0]).toUpperCase()
+                                                                            )}
+                                                                        </div>
+                                                                        <span 
+                                                                            className="text-sm font-medium text-gray-200 cursor-pointer hover:text-indigo-400 transition-colors truncate"
+                                                                            onClick={() => setSelectedStudent(member)}
+                                                                        >
+                                                                            {member.first_name || member.last_name 
+                                                                                ? `${member.last_name || ''}, ${member.first_name || ''}`.trim().replace(/^, /, '').replace(/, $/, '')
+                                                                                : member.email}
+                                                                        </span>
+                                                                    </div>
+                                                                    <button 
+                                                                        onClick={() => handleRemoveMember(member.email)}
+                                                                        className="text-gray-600 hover:text-red-400 ml-2 flex-shrink-0"
+                                                                        title="Quitar del equipo"
+                                                                    >
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                                                        </svg>
+                                                                    </button>
+                                                                </li>
+                                                            )}
+                                                        </Draggable>
+                                                    ))}
+                                                    {provided.placeholder}
+                                                </ul>
+                                            )}
+                                            {members.length === 0 && snapshot.isDraggingOver && (
+                                                 <div className="h-[50px]"></div>
+                                            )}
+                                            {/* Fix placeholder position */}
+                                            {members.length === 0 && provided.placeholder} 
+                                        </div>
+                                    )}
+                                </Droppable>
                             </div>
 
                             <div className="mt-auto pt-4 border-t border-neutral-800">
